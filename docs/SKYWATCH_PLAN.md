@@ -1,6 +1,6 @@
 # SkyWatch: Detailed Project Plan
 
-> Status: **planning / idea stage**. No code yet.
+> Status: **v0.1 built** (plus pass predictions from v0.2 and Sun/Moon/planets from v0.4). Code: [`apps/skywatch/`](../apps/skywatch/).
 > Overview and accuracy summary: see [README](../README.md).
 
 ---
@@ -63,7 +63,7 @@ It should feel like a hacker-style mission-control screen, but be simple enough 
 
 ---
 
-## 4. Repository layout (planned)
+## 4. Repository layout (planned; as built, the app lives in `apps/skywatch/`)
 
 ```
 /
@@ -365,11 +365,12 @@ confidence  = score_i / Σ score
 Each milestone is shippable on its own.
 
 ### v0.1: "Overhead now"
-- [ ] Vite + TS scaffold, deploy pipeline to Pages
-- [ ] Location (geolocation + manual)
-- [ ] Fetch and cache CelesTrak `stations` + `visual`
-- [ ] Propagate → "overhead now" list with az/el/range, refreshing every second
-- [ ] Basic sky radar canvas
+- [x] Vite + TS scaffold, deploy pipeline to Pages
+- [x] Location (geolocation + manual)
+- [x] Fetch and cache CelesTrak `stations` + `visual`
+- [x] Propagate → "overhead now" list with az/el/range, refreshing every second
+- [x] Basic sky radar canvas
+- [ ] Field check: compare the ISS with Heavens-Above on the live site
 
 **Done when:** the ISS position matches Heavens-Above within 0.5° on the live site.
 
@@ -445,7 +446,7 @@ Each milestone is shippable on its own.
 1. Which flight APIs allow browser CORS today, and which have the friendliest terms? (Resolve in v0.3.)
 2. Vanilla TS vs. a small framework (Svelte/Preact) once the UI grows past ~5 screens?
 3. Is server-side alerting worth storing rounded user locations, or are .ics + in-page alerts enough?
-4. Should SkyWatch live at the repo root or under `app/` alongside other "I am bored" projects? (Current plan: `app/`.)
+4. ~~Should SkyWatch live at the repo root or under `app/`?~~ Decided: `apps/skywatch/`, next to `apps/loopland/`.
 5. Name: SkyWatch, or something more unique to avoid clashing with existing apps?
 
 ---

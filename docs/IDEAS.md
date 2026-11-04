@@ -3,9 +3,9 @@
 These are project ideas from brainstorming sessions, saved so they don't get lost. ⭐ marks the favorites.
 Hardware available: a PC and a spare laptop that can act as a server (no SDR, Pi or ESP32 for now).
 
-## 🚀 Planned
-- ⭐ **SkyWatch**: satellite pass radar, Starlink train/flare hunter, aircraft radar and "What's That?" point-and-identify. See [SKYWATCH_PLAN.md](SKYWATCH_PLAN.md).
-- ⭐ **LoopLand** (working name): real-life Paper.io for runners. Run a loop and claim the land inside, steal land from other runners. See [LOOPLAND_PLAN.md](LOOPLAND_PLAN.md).
+## 🚀 Building
+- ⭐ **SkyWatch**: satellite pass radar, Starlink train/flare hunter, aircraft radar and "What's That?" point-and-identify. **v0.1 built** in [`apps/skywatch`](../apps/skywatch/). Plan: [SKYWATCH_PLAN.md](SKYWATCH_PLAN.md).
+- ⭐ **LoopLand** (working name): real-life Paper.io for runners. Run a loop and claim the land inside, steal land from other runners. **v0.1 sandbox built** in [`apps/loopland`](../apps/loopland/). Plan: [LOOPLAND_PLAN.md](LOOPLAND_PLAN.md).
 
 ## 🅿️ Parked
 ### ⭐ FlagRun: CTF IRL, runners edition

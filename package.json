@@ -1,0 +1,13 @@
+{
+  "name": "iambored",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev:skywatch": "npm run dev -w skywatch",
+    "dev:loopland": "npm run dev -w loopland",
+    "test": "npm run test --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "build": "node scripts/build-site.mjs"
+  }
+}

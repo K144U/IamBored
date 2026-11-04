@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Real-life Paper.io for runners: run a loop, the land inside is yours." />
+    <meta name="theme-color" content="#ff2e88" />
+    <title>LoopLand</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2 28 9v14l-12 7-12-7V9z' fill='%23ff2e88'/%3E%3Cpath d='M16 9 22 12.5v7L16 23l-6-3.5v-7z' fill='%23fff'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="side">
+        <header class="brand">
+          <h1><span class="hex" aria-hidden="true">⬢</span> LoopLand <span class="ver">v0.1 sandbox</span></h1>
+          <p class="tag">Run a loop. The land inside is yours.</p>
+        </header>
+
+        <section class="card">
+          <h2>Add runs</h2>
+          <p class="as">Uploading as <span id="active-player" class="chip"></span> <small>(tap a player below to switch)</small></p>
+          <label id="drop" class="drop">
+            <input id="file" type="file" accept=".gpx,.tcx,application/gpx+xml" multiple hidden />
+            <span class="drop-big">Drop GPX / TCX files</span>
+            <span class="drop-small">or tap to choose · Strava: activity ⋯ → Export GPX</span>
+          </label>
+          <div class="row">
+            <button id="btn-demo" class="btn primary">▶ Load demo season</button>
+            <button id="btn-reset" class="btn ghost">Reset</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Leaderboard</h2>
+          <ol id="players" class="players"></ol>
+          <form id="add-player" class="row">
+            <input id="new-player" class="input" placeholder="Add a friend (hot-seat)" maxlength="24" aria-label="New player name" />
+            <button class="btn">Add</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <h2>Runs</h2>
+          <ul id="log" class="log"></ul>
+        </section>
+
+        <details class="card rules">
+          <summary>How it works</summary>
+          <ul>
+            <li><b>Claim:</b> close a loop (or finish within 75 m of your start) and everything inside becomes yours.</li>
+            <li><b>Paper.io move:</b> run out of your land and back in, and the pocket in between is filled.</li>
+            <li><b>Steal:</b> loop around someone else's land to take it.</li>
+            <li><b>Fade:</b> land you don't visit for 14 days fades, and anyone can grab it just by running through. After 30 days it's neutral again.</li>
+            <li><b>Fair play:</b> runs faster than 22 km/h on average, GPS teleports and planned routes (no timestamps) don't count.</li>
+            <li>The map is made of ~25 m hexagons, about the size of GPS error.</li>
+          </ul>
+          <p class="privacy">🔒 Sandbox mode: your runs never leave this browser.</p>
+        </details>
+
+        <footer class="foot">Part of <a href="../">IamBored</a> · map © OpenStreetMap, CARTO · hexes: H3</footer>
+      </aside>
+
+      <main class="map-wrap">
+        <div id="map" aria-label="Territory map"></div>
+        <div class="legend">
+          <span><i class="sw solid"></i>Owned</span>
+          <span><i class="sw faded"></i>Fading</span>
+          <span><i class="sw trail"></i>Last run</span>
+        </div>
+      </main>
+    </div>
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,6 +1,6 @@
 # LoopLand: Real-Life Paper.io for Runners
 
-> Status: **planning / idea stage**. No code yet. "LoopLand" is a working name.
+> Status: **v0.1 sandbox built**. Code: [`apps/loopland/`](../apps/loopland/). "LoopLand" is a working name.
 
 **Run a loop and the land inside it is yours.** Your city is the game board, your runs are your moves, and other runners can steal your territory by looping through it.
 
@@ -280,9 +280,11 @@ seasons     (id, starts_at, ends_at, final_map_snapshot)
 Each milestone is shippable on its own.
 
 ### v0.1: Solo sandbox (no server)
-- [ ] Static page: drag in GPX files → claim algorithm runs in the browser → hexes on a map
-- [ ] Stored in localStorage/IndexedDB
-- [ ] Replay animation
+- [x] Static page: drag in GPX files → claim algorithm runs in the browser → hexes on a map
+- [x] Stored in localStorage/IndexedDB
+- [x] Replay animation
+- [x] Demo season + hot-seat players (friends on one device) to test stealing
+- [ ] Playtest with your own last 10 runs
 
 **Done when:** your own last 10 runs produce a sensible territory map. This is where we find out if it's fun.
 
