@@ -1,7 +1,7 @@
 # Handover
 
-> Last updated: 2026-11-04, after adding the SkyWatch AR view (second batch of work, same session).
-> Branch: `claude/peaceful-wright-2tlzr7` (all work is here; `main` has only the initial commit; no PR opened yet).
+> Last updated: 2026-11-04, after adding the SkyWatch AR view.
+> Working branch: `claude/peaceful-wright-2tlzr7`. `main` was fast-forwarded to the branch once, on the owner's request ("merge to main"), at `468982a`. **The AR commit `ce84590` is on the branch only; `main` is one commit behind.** No PRs exist.
 
 ## 1. Context: the owner and how we got here
 - The owner was **idea hunting** for cool OSINT / hacker-style projects, then decided to build two of them. The full brainstorm is saved in `docs/IDEAS.md`.
@@ -10,6 +10,8 @@
   - likes "hacker-esque" visuals and sky/space and OSINT topics
   - wants things deployable as **webpages**
   - asks for detailed plans, pushed to the repo
+  - wanted an **AR mode** so satellites are easier to spot (now built, see §3)
+  - "merge to main" has meant a fast-forward push of the branch to `main` (no PR). Only do it when asked.
 - Parked idea: **FlagRun** (CTF IRL for runners), in `docs/IDEAS.md` under "Parked". It might later run as events on the LoopLand map.
 
 ## 2. Repo map
@@ -22,7 +24,7 @@ site/index.html           landing page linking both apps
 scripts/build-site.mjs    builds both apps → dist/ (+ .nojekyll)
 scripts/fetch-tle-snapshot.mjs  daily CelesTrak snapshot → apps/skywatch/public/data/tle/ (gitignored)
 deploy/pages.yml          GitHub Pages workflow, NOT active yet (see §5)
-docs/SKYWATCH_PLAN.md     full SkyWatch design + milestones (v0.1 ticked)
+docs/SKYWATCH_PLAN.md     full SkyWatch design + milestones (v0.1 + most of v0.5 ticked)
 docs/LOOPLAND_PLAN.md     full LoopLand design + milestones (v0.1 ticked)
 docs/IDEAS.md             idea backlog
 ```
@@ -67,11 +69,20 @@ docs/IDEAS.md             idea backlog
   - URL params `?lat=&lon=&t=`
 
 **Verified:**
-- 12 unit tests, including standing under the satellite giving ~90° elevation, the antipode giving < −80°, OMM ≡ TLE, and pass rise/set at 0° ± 0.1°
-- Playwright screenshots at desktop and iPhone 13 sizes, no horizontal overflow
+- **34 unit tests:**
+  - satellites (12): standing under the satellite gives ~90° elevation, the antipode < −80°, OMM ≡ TLE, pass rise/set at 0° ± 0.1°
+  - orientation (16): upright/north, alpha direction, flat/zenith, landscape, orthonormality, iOS compass alignment, yaw/declination, projection, `coverFocal`, smoothing
+  - identify (5), declination vs known values (1)
+- Playwright screenshots at desktop and phone sizes, no horizontal overflow
 - production build served from a sub-path, with the snapshot fallback exercised
+- **AR, emulated Pixel 7 with synthetic `deviceorientationabsolute` events and a fake camera:**
+  - aiming at the ISS's true position (with Beijing's −7.5° declination) put it **0.7° from the crosshair**
+  - facing south gave 173° (180° magnetic − 7.5°), as expected
+  - with a compass error of +10° injected, **Moon calibration corrected −10.2°** (0.2° is rounding in the test script), after which the ISS was in the crosshair; calibration persisted across close/reopen
+  - drag mode, the guide arrow with turn text, and the camera feed (1920×1080 fake stream, cover-fit) all worked
 
 **Not verified (do these first):**
+- **AR on real phones.** Everything above used emulated sensor events. On iPhone, the code assumes `webkitCompassHeading` is the rear camera's heading when the phone is held upright. Check that label positions match real objects (the Moon is the easiest test) on one Android and one iPhone.
 - **CelesTrak CORS from a real browser.** The sandbox can't reach CelesTrak. It's assumed to allow cross-origin requests. If it doesn't, the app silently uses the snapshot; the fix is a Cloudflare Worker proxy (plan §5/§12).
 - **Field accuracy:** compare ISS passes with Heavens-Above on the live site (the v0.1 "done when" item).
 - Starlink group performance on a mid-range phone (~10k objects in the worker).
@@ -81,6 +92,13 @@ docs/IDEAS.md             idea backlog
 - No bright-star catalog yet (v0.4).
 - Pass list is computed on the main thread (fine for one satellite).
 - The `?t=` simulated clock advances in real time; there is no speed-up.
+- **AR:**
+  - calibration corrects yaw only (not tilt or roll)
+  - the default camera FOV is 64° along the long side of the video; the "Zoom fit" slider is the only FOV calibration so far
+  - positions are extrapolated linearly between 1 Hz samples
+  - satellites that aren't visible right now are hidden unless "All satellites" is ticked
+  - the Generic Sensor API (`AbsoluteOrientationSensor`) isn't used; Android relies on `deviceorientationabsolute`
+  - camera and sensors need HTTPS (or localhost)
 
 **Next (from `docs/SKYWATCH_PLAN.md`):**
 1. v0.3 aircraft layer: test CORS on adsb.lol / airplanes.live / OpenSky first.
@@ -146,7 +164,9 @@ docs/IDEAS.md             idea backlog
   2. set Settings → Pages → Source: GitHub Actions
   3. merge to `main`
 - The site will be at `https://k144u.github.io/IamBored/` (landing), with `/skywatch/` and `/loopland/` under it.
-- The owner hasn't asked for a PR yet. Ask before opening one.
+- `main` contains everything up to the handover commit `468982a`. The AR work (`ce84590`) needs another fast-forward when the owner asks: `git push origin claude/peaceful-wright-2tlzr7:main`.
+- Unknown whether the owner has done the Pages setup yet. If `https://k144u.github.io/IamBored/` returns 404, it hasn't been done.
+- The owner hasn't asked for a PR. Ask before opening one.
 
 ## 6. Testing in the cloud sandbox
 - **Network:** `registry.npmjs.org` works. `celestrak.org`, `basemaps.cartocdn.com` and `tile.openstreetmap.org` are blocked.
@@ -174,10 +194,23 @@ docs/IDEAS.md             idea backlog
   - `sunPos(jday(date)).rsun` is an `{x,y,z}` object (it was an array in v6)
   - `gstime(date)`
 - **astronomy-engine 2.1:** `Equator(body, date, observer, true, true)` → `Horizon(date, observer, ra, dec, 'normal')`; `Illumination(body, date).mag/.phase_fraction`.
+- **geomagnetism 0.2.0:** CommonJS that assigns onto `module.exports`, so use a default import (`import geomagnetism from 'geomagnetism'`). `geomagnetism.model(date, { allowOutOfBoundsModel: true }).point([lat, lon]).decl` gives degrees, east positive. It ships WMM2015–WMM2025 (valid to the end of 2029), with types included.
+- **W3C DeviceOrientation:** `DeviceOrientationEvent.requestPermission` exists in iOS Safari *and* in headless Chromium, where it answers "denied". Never let that stop listening.
 - **h3-js 4.5:** `polygonToCells([[lat,lng]…], res)`, `cellsToMultiPolygon(cells, true)` (GeoJSON order), `gridPathCells`, `gridDisk`, `getHexagonAreaAvg(res, 'km2')`.
 
 ## 8. Open questions for the owner
 1. SkyWatch radar orientation: keep E on the right (map-style), or switch to "looking up" (E on the left) as an option?
 2. LoopLand name: keep "LoopLand"? (Alternatives are in plan §15.)
 3. Should the sandbox get a JSON export/import so friends can share a map before a server exists?
-4. Open a PR to `main` now, or keep building on the branch?
+4. Merge the AR commit to `main` (fast-forward) so it goes live?
+5. After trying AR on a phone: do labels line up with real objects? Which phone and browser? (This decides whether the iOS compass handling or the FOV default needs work.)
+
+## 9. History (branch `claude/peaceful-wright-2tlzr7`)
+| Commit | What |
+|---|---|
+| `0b0bb2c`…`d4fcb2c` | SkyWatch README, then the web-first plan and accuracy section |
+| `67821c7` | Detailed SkyWatch plan + idea backlog |
+| `2a19e3e` | LoopLand plan, FlagRun parked, backlog expanded |
+| `e1fbd3f` | SkyWatch v0.1 + LoopLand v0.1 sandbox, monorepo, landing page, deploy workflow (parked in `deploy/`) |
+| `468982a` | CLAUDE.md + this handover (**`main` is here**) |
+| `ce84590` | SkyWatch AR spotting view (branch only) |
