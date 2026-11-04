@@ -492,7 +492,7 @@ function updateStars(at: Date) {
 
 async function loadStars() {
   try {
-    const res = await fetch('./data/stars.json');
+    const res = await fetch(`${import.meta.env.BASE_URL}data/stars.json`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     stars = parseCatalog((await res.json()) as StarCatalogFile);
     updateStars(now());
@@ -501,7 +501,7 @@ async function loadStars() {
     console.warn('Star catalogue unavailable:', err);
   }
   try {
-    const res = await fetch('./data/constellations.json');
+    const res = await fetch(`${import.meta.env.BASE_URL}data/constellations.json`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     figures = parseConstellations((await res.json()) as ConstellationFile);
     updateStars(now());

@@ -172,8 +172,12 @@ docs/IDEAS.md             idea backlog
 - deck.gl `H3HexagonLayer` if Leaflet gets slow
 
 ## 5. Deployment status
+- **Live on kittu.pro** (session 2, owner's request): `www.kittu.pro/skywatch` and `www.kittu.pro/loopland`, with `/sky` and `/run` redirecting there. The owner suggested `/run`; the canonical paths use the app names and the short ones redirect.
+  - IamBored side: `scripts/build-embed.mjs` (`npm run build:embed` → `dist-embed/`, gitignored) builds with `--base=/skywatch/` and `/loopland/` (Next.js strips trailing slashes, so relative `./` paths would break) and sets `VITE_HOME_NAME`/`VITE_HOME_URL` for the footer (defaults in each app's `.env`: IamBored, `../`). Any new public-file reference must use `import.meta.env.BASE_URL` in code or `%BASE_URL%` in `index.html`, never a bare `./`.
+  - kittu.pro side (repo `K144U/Kittu.pro`, private, read its `newDesign/handover.md` rules first: push only when asked, deploy = push `master`, never commit secrets): `scripts/sync-labs.mjs` copies the builds into `public/skywatch` and `public/loopland` (+ `version.json` with the IamBored commit); `next.config.ts` rewrites `/skywatch` → `/skywatch/index.html` (same for loopland), redirects `/sky`, `/run`, and caches `assets/` immutably; `app/skywatch/data/tle/[file]/route.ts` is the CelesTrak backup (stations, visual, last-30-days; CDN-cached 2 h; Starlink excluded because it's over the 4.5 MB function limit); both pages are in `app/sitemap.ts`.
+  - To update: change IamBored, merge to `main`, then in kittu.pro run `node scripts/sync-labs.mjs`, check, commit, push `master`.
 - `deploy/pages.yml` is a complete workflow: typecheck, test, snapshot TLEs (continue-on-error), build, then deploy Pages from `main`; also scheduled daily at 04:23 UTC.
-- **It is not active.** The cloud session's GitHub token was refused when creating `.github/workflows/*` ("no `workflow` scope"). The owner must:
+- GitHub Pages (optional now): **not active.** The cloud session's GitHub token was refused when creating `.github/workflows/*` ("no `workflow` scope"). The owner must:
   1. create `.github/workflows/pages.yml` on GitHub with that content
   2. set Settings → Pages → Source: GitHub Actions
   3. merge to `main`
