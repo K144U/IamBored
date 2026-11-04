@@ -1,6 +1,6 @@
 # SkyWatch: Detailed Project Plan
 
-> Status: **v0.1 built** (plus pass predictions from v0.2 and Sun/Moon/planets from v0.4). Code: [`apps/skywatch/`](../apps/skywatch/).
+> Status: **v0.1 built** (plus pass predictions from v0.2) and **v0.4 sky bodies built**. Code: [`apps/skywatch/`](../apps/skywatch/).
 > Overview and accuracy summary: see [README](../README.md).
 
 ---
@@ -142,7 +142,7 @@ It should feel like a hacker-style mission-control screen, but be simple enough 
 
 ### 5.3 Sky bodies
 - Sun, Moon, planets: computed live with astronomy-engine. No network needed.
-- Stars: bundled `stars.json` built once from the Yale Bright Star Catalog / Hipparcos (name, RA, Dec, magnitude), limited to mag ≤ 4.5 (~900 stars, small file).
+- Stars: bundled `public/data/stars.json`, built once by `scripts/build-stars.mjs` from the HYG database v4.1 (Hipparcos + Yale BSC + Gliese; CC BY-SA 4.0): RA, Dec, magnitude, B−V colour, name, Bayer designation, constellation. 925 stars with mag ≤ 4.5, 48 KB (18 KB gzipped).
 
 ### 5.4 Location & time
 - Geolocation API, with manual entry or map click as a fallback (and for privacy).
@@ -196,7 +196,7 @@ A satellite is **naked-eye visible** when all three hold:
 
 ### 6.7 Sky bodies
 - astronomy-engine `Equator()` → `Horizon()` with refraction for the Sun, Moon and planets.
-- Stars: J2000 RA/Dec → apply precession (or ignore; ~0.35° by 2026 is borderline, so apply it) → horizon coordinates.
+- Stars (built in `src/engine/stars.ts`): J2000 unit vectors, then one `Rotation_EQJ_HOR(time, observer)` matrix per frame (precession + nutation + Earth rotation), a 3×3 multiply per star, and `Refraction('normal', el)`. Matches astronomy-engine's own `Equator()`→`Horizon()` within 0.01° (tested). Proper motion and annual aberration (~20″) are ignored.
 - Moon phase and illumination are also used as input for the sky brightness estimate.
 
 ---
@@ -292,13 +292,15 @@ confidence  = score_i / Σ score
 5. **Map:** aircraft and satellite ground tracks, the user's location, the visibility footprint.
 6. **Settings:** location (auto or manual), sky quality, units, layers, alerts, calibration reset, privacy info.
 
+**Built (phone layout, < 900 px wide):** a bottom tab bar with **Radar · Overhead · Planets · Settings**, one section at a time. Tapping a dot or a list row opens a **details bottom sheet** over the radar (swipe up to expand, swipe down or ✕ to close). In landscape the radar sits at full height on the left with the details as a side panel. Desktop keeps the two-column dashboard.
+
 ### 8.2 Look & feel
 - Dark "mission control" theme: monospace data, glowing accents, scanline or grid backdrop, all subtle and readable.
 - A **red night mode** that keeps your eyes dark-adapted for stargazing.
 - Respect `prefers-reduced-motion`. Full keyboard navigation on desktop.
 
 ### 8.3 Onboarding
-1. "Where are you?" (allow location, or pick on the map)
+1. "Where are you?" (allow location, or pick on the map) *(built: first-run card with "Use my location" / "Pick a city"; an offline list of ~100 cities, so nothing typed leaves the browser)*
 2. "Want to identify things with your phone?" (sensor and camera permissions, with an explanation)
 3. A quick calibration prompt if the Moon or a bright planet is up
 
@@ -375,9 +377,9 @@ Each milestone is shippable on its own.
 **Done when:** the ISS position matches Heavens-Above within 0.5° on the live site.
 
 ### v0.2: Passes & visibility
-- [ ] Shadow + twilight + magnitude model
-- [ ] Pass prediction (48 h) + passes screen + .ics export
-- [ ] Web Worker propagation, Starlink group
+- [x] Shadow + twilight model *(magnitude model not done: CelesTrak's OMM has no standard magnitude)*
+- [x] Pass prediction (48 h) + passes screen + .ics export
+- [x] Web Worker propagation, Starlink group
 
 **Done when:** predicted visible ISS passes match Heavens-Above times within ±10 s.
 
@@ -389,17 +391,18 @@ Each milestone is shippable on its own.
 **Done when:** aircraft positions on the radar match a flight-tracking site within ~1°.
 
 ### v0.4: Sky bodies
-- [ ] Sun, Moon (with phase), planets, bright stars on the radar
-- [ ] Red night mode
+- [x] Sun, Moon (with phase), planets, bright stars on the radar
+- [x] Red night mode
 
 **Done when:** planet positions are within 1′ of the reference.
 
 ### v0.5: What's That?
-- [ ] Sensor fusion → pointing vector (Android + iOS paths), declination
-- [ ] Calibration flow
-- [ ] Matcher (spatial + prior), top-3 card
-- [ ] AR camera overlay
-- [ ] Motion matching ("Track")
+- [x] Sensor fusion → pointing vector (Android + iOS paths), declination *(`deviceorientationabsolute` / `webkitCompassHeading`; `AbsoluteOrientationSensor` not used yet)*
+- [x] Calibration flow *(one-point; multi-point fit and FOV calibration not yet)*
+- [x] Matcher (spatial + prior), top-3 card
+- [x] AR camera overlay *(fixed 64° long-side FOV)*
+- [x] Motion matching ("Track") *(first/last-quarter average over the hold)*
+- [ ] Field test on real Android and iOS phones (the "done when" below)
 
 **Done when:** ≥ 90 % top-1 accuracy for Moon/planets and ≥ 70 % top-3 for satellites and planes in field tests after calibration.
 
@@ -413,10 +416,12 @@ Each milestone is shippable on its own.
 - [ ] Optional YAMNet classifier (lazy-loaded)
 
 ### v0.8: PWA & alerts
+- [x] Web app manifest + icons ("Add to Home Screen" opens full-screen)
 - [ ] Service worker, offline passes, install prompt
 - [ ] ntfy alerts via Worker cron (opt-in)
 
 ### Later
+- [x] Constellation lines, radar zoom, observer time zones *(session 2)*
 - [ ] 3D globe view (globe.gl / CesiumJS)
 - [ ] Extra layers: earthquakes (USGS), ships (AIS), weather/cloud cover ("will clouds block this pass?")
 - [ ] Rocket launch countdowns (Launch Library 2)

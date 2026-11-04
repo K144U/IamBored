@@ -18,7 +18,10 @@
   --moon: #e9eef5;
   --planet: #ffb0e0;
   --select: #ffe14d;
+  --star-tint: ;
+  --constellation: rgba(140, 175, 220, 0.3);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --tabs-h: 60px;
 }
 
 /* Red night mode: keeps your eyes dark-adapted for stargazing. */
@@ -41,6 +44,8 @@
   --moon: #ff9e9e;
   --planet: #ff7aa8;
   --select: #ffb0b0;
+  --star-tint: #ff6b6b;
+  --constellation: rgba(255, 70, 70, 0.28);
 }
 
 * {
@@ -198,7 +203,7 @@ button.link {
   align-items: start;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 899px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -217,7 +222,7 @@ button.link {
   top: 64px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 899px) {
   .radar-panel {
     position: static;
   }
@@ -232,7 +237,7 @@ button.link {
   align-items: center;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 899px) {
   .radar-wrap {
     max-height: none;
   }
@@ -241,7 +246,34 @@ button.link {
 canvas {
   display: block;
   cursor: crosshair;
-  touch-action: manipulation;
+  touch-action: none; /* the radar handles pinch and drag itself */
+}
+
+.radar-wrap {
+  position: relative;
+}
+
+.radar-zoom {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.radar-zoom .btn {
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+}
+
+.radar-zoom .btn[hidden] {
+  display: none;
 }
 
 .legend {
@@ -275,6 +307,21 @@ canvas {
 }
 .dot.planet {
   background: var(--planet);
+}
+.dot.star {
+  width: 5px;
+  height: 5px;
+  margin-left: 2px;
+  background: var(--text);
+  vertical-align: 1px;
+}
+.star-chip {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: 1px;
 }
 
 .status {
@@ -513,26 +560,812 @@ tr.vis td {
   }
 }
 
-@media (max-width: 600px) {
+/* ───────────── shared components ───────────── */
+
+.brand-name {
+  margin-left: 0.45em;
+}
+
+.night-btn span + .btn-text {
+  margin-left: 6px;
+}
+
+.btn.big {
+  padding: 10px 16px;
+  font-weight: 600;
+}
+
+.btn.wide {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.icon-btn {
+  font: inherit;
+  color: var(--text-dim);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 50%;
+}
+
+.icon-btn:hover {
+  color: var(--text);
+}
+
+.loc-form {
+  flex-wrap: nowrap;
+}
+
+.card h2.gap {
+  margin-top: 16px;
+}
+
+.toggle input,
+.group input {
+  accent-color: var(--accent);
+}
+
+.onboard {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent-dim);
+}
+
+.onboard p {
+  margin: 0 0 10px;
+}
+
+.onboard[hidden] {
+  display: none;
+}
+
+.radar-panel .highlight {
+  margin: 0 0 10px;
+}
+
+.sheet-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sheet-bar h2 {
+  margin: 0;
+}
+
+.sheet-grip {
+  display: none;
+}
+
+.sheet-close {
+  visibility: hidden;
+}
+
+body.has-sel .sheet-close {
+  visibility: visible;
+}
+
+.tabs {
+  display: none;
+}
+
+/* ───────────── phones and small tablets: app-style layout ───────────── */
+
+@media (max-width: 899px) {
+  html,
+  body {
+    font-size: 15px;
+  }
+
+  body {
+    padding-bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom));
+    background-size: 40px 40px;
+  }
+
   .top {
-    gap: 6px 12px;
-    padding: 8px 12px;
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding: calc(6px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) 6px
+      calc(12px + env(safe-area-inset-left));
   }
+
+  .brand {
+    letter-spacing: 0.1em;
+    font-size: 15px;
+  }
+
+  .utc,
+  .btn-text {
+    display: none;
+  }
+
   .clocks {
-    font-size: 13px;
+    font-size: 14px;
+    white-space: nowrap;
   }
+
+  /* while the details sheet is up, give the radar the room */
+  body.has-sel .radar-panel .highlight,
+  body.has-sel .onboard {
+    display: none;
+  }
+
+  .star-text {
+    display: none;
+  }
+
   .sky-state {
-    margin-left: 0;
+    margin-left: auto;
+    min-width: 0;
     font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
+
+  .night-btn {
+    flex: none;
+    width: 44px;
+    height: 40px;
+    padding: 0;
+    font-size: 18px;
+  }
+
+  .note {
+    margin: 8px 10px 0;
+    font-size: 13px;
+    padding: 6px 10px;
+  }
+
+  .layout {
+    display: block;
+    padding: 10px calc(10px + env(safe-area-inset-right)) 16px calc(10px + env(safe-area-inset-left));
+  }
+
+  /* one section at a time, picked with the tab bar */
+  .view:not(.active) {
+    display: none !important;
+  }
+
+  .side {
+    gap: 10px;
+  }
+
+  .radar-panel {
+    position: static;
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+
+  .radar-wrap {
+    max-height: calc(100vh - 230px);
+    max-height: calc(100dvh - 230px);
+    min-height: 240px;
+  }
+
+  .legend {
+    font-size: 11.5px;
+    gap: 4px 12px;
+  }
+
+  .status {
+    display: none;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  .card h2 {
+    font-size: 12.5px;
+    margin-bottom: 10px;
+  }
+
+  /* comfortable thumb targets (≥ 44 px) */
   .btn {
-    padding: 5px 10px;
+    min-height: 44px;
+    padding: 8px 14px;
   }
-  .note,
-  .highlight {
-    margin: 8px 12px 0;
+
+  .input {
+    font-size: 16px; /* below 16 px iOS zooms the page on focus */
+    min-height: 44px;
+  }
+
+  .toggle {
+    min-height: 44px;
+    margin: 0;
+    font-size: 15px;
+  }
+
+  .toggle input,
+  .group input {
+    width: 22px;
+    height: 22px;
+    flex: none;
+  }
+
+  .group {
+    padding: 8px 0;
+    min-height: 48px;
+    font-size: 15px;
+  }
+
+  .group small {
+    font-size: 12.5px;
+  }
+
+  table {
+    font-size: 14px;
+  }
+
+  td {
+    padding: 11px 6px;
+  }
+
+  td.name {
+    max-width: 42vw;
+  }
+
+  .table-wrap {
+    max-height: none;
+  }
+
+  .overhead th:nth-child(4),
+  .overhead td:nth-child(4) {
+    display: none;
+  }
+
+  .kv {
+    font-size: 14px;
+    gap: 5px 14px;
+  }
+
+  /* details slide up from the bottom, over the radar */
+  .sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom));
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    max-height: 42vh;
+    max-height: 42dvh;
+    padding: 0;
+    border-radius: 16px 16px 0 0;
+    border-bottom: 0;
+    background: var(--panel);
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.6);
+    transform: translateY(calc(100% + var(--tabs-h) + 40px));
+    visibility: hidden;
+    transition:
+      transform 0.22s ease,
+      max-height 0.22s ease,
+      visibility 0s linear 0.22s;
+  }
+
+  body.has-sel .sheet {
+    transform: none;
+    visibility: visible;
+    transition:
+      transform 0.22s ease,
+      max-height 0.22s ease;
+  }
+
+  body:not([data-tab='radar']) .sheet {
+    display: none;
+  }
+
+  .sheet.expanded {
+    max-height: 85vh;
+    max-height: 85dvh;
+  }
+
+  .sheet-bar {
+    position: relative;
+    flex: none;
+    padding: 18px 6px 6px 14px;
+    touch-action: none;
+  }
+
+  .sheet-bar h2 {
+    margin: 0;
+  }
+
+  .sheet-grip {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 96px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .sheet-grip i {
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 8px auto 0;
+    border-radius: 2px;
+    background: var(--text-dim);
+  }
+
+  .sheet-close {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+
+  .sheet-body {
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 0 14px calc(14px + env(safe-area-inset-bottom));
+  }
+
+  .sheet-body .hint:only-child {
+    display: none;
+  }
+
+  /* bottom tab bar */
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    height: calc(var(--tabs-h) + env(safe-area-inset-bottom));
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: color-mix(in srgb, var(--panel) 96%, transparent);
+    border-top: 1px solid var(--panel-border);
+    backdrop-filter: blur(8px);
+  }
+
+  .tab {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    white-space: nowrap;
+    font: 600 10.5px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    color: var(--text-dim);
+    background: none;
+    border: 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tab svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+  }
+
+  .tab[aria-current='page'] {
+    color: var(--accent);
+  }
+
+  .tab-badge {
+    position: absolute;
+    top: 6px;
+    left: calc(50% + 8px);
+    min-width: 18px;
+    padding: 1px 5px;
+    border-radius: 9px;
+    font: 700 10.5px/16px var(--mono);
+    color: var(--bg);
+    background: var(--sat-visible);
+  }
+
+  .tab-badge[hidden] {
+    display: none;
+  }
+
+  .foot {
+    padding: 8px 16px 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .ss-sun {
+    display: none;
+  }
+}
+
+@media (max-width: 360px) {
+  .brand-name {
+    display: none;
+  }
+}
+
+/* landscape phones: radar on the left at full height, banners and legend beside it */
+@media (max-width: 899px) and (orientation: landscape) and (max-height: 500px) {
+  :root {
+    --tabs-h: 48px;
+  }
+  .note {
+    display: none;
   }
   .layout {
-    padding: 12px;
+    padding-top: 6px;
   }
+  .radar-panel {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 16px;
+    align-items: start;
+  }
+  .radar-wrap {
+    grid-column: 1;
+    grid-row: 1 / span 4;
+    width: calc(100dvh - 112px);
+    height: calc(100dvh - 112px);
+    min-height: 0;
+    max-height: none;
+    aspect-ratio: auto;
+  }
+  .radar-panel > :not(.radar-wrap) {
+    grid-column: 2;
+  }
+  .legend {
+    justify-content: flex-start;
+  }
+  .radar-panel .hint.center {
+    text-align: left;
+  }
+  .tab {
+    flex-direction: row;
+    gap: 8px;
+    font-size: 13px;
+  }
+  .tab svg {
+    width: 20px;
+    height: 20px;
+  }
+  .tab-badge {
+    position: static;
+  }
+  /* details as a side panel instead of a bottom sheet */
+  .sheet {
+    left: auto;
+    width: min(420px, 55vw);
+    max-height: calc(100dvh - var(--tabs-h) - 56px);
+    border-radius: 16px 0 0 0;
+  }
+  .sheet.expanded {
+    max-height: calc(100dvh - var(--tabs-h) - 56px);
+  }
+}
+
+/* ───────────── Passes ───────────── */
+
+.hint.top {
+  margin: 0 0 8px;
+}
+
+.passes-tools {
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.passes-tools .toggle {
+  margin: 0;
+}
+
+.passes-list .empty {
+  color: var(--text-dim);
+  text-align: center;
+  padding: 16px 8px;
+  margin: 0;
+}
+
+.pass-day {
+  font: 600 11px var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 12px 0 2px;
+}
+
+.pass-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--panel-border) 50%, transparent);
+  cursor: pointer;
+}
+
+.pass-row:hover {
+  background: var(--accent-dim);
+}
+
+.pass-row.sel {
+  background: color-mix(in srgb, var(--select) 16%, transparent);
+}
+
+.pass-when {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--mono);
+}
+
+.pass-when small {
+  white-space: nowrap;
+}
+
+.pass-when small,
+.pass-what small {
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+.pass-what {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pass-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pass-row.imp .pass-name {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.pass-row.live {
+  border-left: 3px solid var(--sat-visible);
+  background: color-mix(in srgb, var(--sat-visible) 10%, transparent);
+}
+
+.pass-row.live .pass-when small {
+  color: var(--sat-visible);
+  font-weight: 700;
+}
+
+.cal {
+  font-size: 18px;
+  width: 44px;
+  height: 44px;
+}
+
+@media (min-width: 900px) {
+  .passes-list {
+    max-height: 420px;
+    overflow: auto;
+  }
+}
+
+/* What's That? needs a phone's motion sensors: desktop never shows it */
+@media (min-width: 900px) {
+  .wt {
+    display: none !important;
+  }
+}
+
+/* ───────────── What's That? (phones) ───────────── */
+
+.wt {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: calc(53px + env(safe-area-inset-top));
+  bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom));
+  z-index: 4;
+  overflow: hidden;
+  background: #02040a;
+}
+
+.wt video,
+.wt canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.wt video {
+  object-fit: cover;
+}
+
+:root[data-night='1'] .wt video {
+  filter: grayscale(1) sepia(1) hue-rotate(-50deg) saturate(5) brightness(0.55);
+}
+
+.wt canvas {
+  touch-action: none;
+}
+
+.wt-top {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.wt-top > * {
+  pointer-events: auto;
+}
+
+.wt-pill {
+  font: 12px var(--mono);
+  padding: 6px 10px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.wt-pill:empty {
+  visibility: hidden;
+}
+
+.wt-btn {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.wt-start {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-60%);
+  padding: 20px;
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  text-align: center;
+}
+
+.wt-start h2 {
+  font: 700 16px var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 8px;
+}
+
+.wt-start .btn {
+  min-width: 160px;
+  margin: 8px 0 4px;
+}
+
+.wt-start[hidden] {
+  display: none;
+}
+
+.wt-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 38%;
+  overflow: auto;
+  padding: 8px 12px 10px;
+  border-radius: 16px 16px 0 0;
+  border-top: 1px solid var(--panel-border);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.wt-start:not([hidden]) ~ .wt-card {
+  display: none;
+}
+
+.wt-matches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wt-matches .m {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--panel-border) 50%, transparent);
+}
+
+.wt-matches .m.none,
+.wt-matches .m.warn-sun {
+  display: block;
+  color: var(--text-dim);
+  font-size: 13.5px;
+}
+
+.wt-matches .m.warn-sun {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.m-rank {
+  font: 700 13px var(--mono);
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.m-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.m-main small {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.m-main .m-look {
+  color: var(--text);
+  opacity: 0.8;
+}
+
+.m-conf {
+  font: 700 15px var(--mono);
+  color: var(--accent);
+}
+
+.m .m-show {
+  min-height: 36px;
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.wt-actions {
+  margin-top: 8px;
+  flex-wrap: nowrap;
+}
+
+.wt-actions .btn {
+  flex: 1;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+
+#wt-track.on {
+  background: color-mix(in srgb, var(--select) 25%, transparent);
+  border-color: var(--select);
+}
+
+.wt-card .hint {
+  margin-top: 8px;
+}
+
+.wt-card .hint .link {
+  padding: 0;
 }

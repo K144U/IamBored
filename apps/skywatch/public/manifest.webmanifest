@@ -1,0 +1,17 @@
+{
+  "name": "SkyWatch: live sky radar",
+  "short_name": "SkyWatch",
+  "description": "Satellites, the ISS, the Moon, planets and bright stars above you right now.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#05080d",
+  "theme_color": "#05080d",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

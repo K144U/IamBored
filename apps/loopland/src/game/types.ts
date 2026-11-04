@@ -19,6 +19,11 @@ export interface Activity {
   startedAt: number;
   source: string;
   points: TrackPoint[];
+  /**
+   * when this file was added (ms). Re-uploading an edited export of the same run (e.g. cropped on
+   * Strava) makes a newer version; the newest upload is the one that counts. Missing on old data.
+   */
+  uploadedAt?: number;
 }
 
 export interface Rules {

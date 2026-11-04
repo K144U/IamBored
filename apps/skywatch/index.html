@@ -2,94 +2,195 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Live sky radar: satellites, the ISS, the Moon and planets above you right now." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Live sky radar: satellites, the ISS, the Moon, planets and bright stars above you right now." />
     <meta name="theme-color" content="#05080d" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SkyWatch" />
     <title>SkyWatch</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%2305080d' stroke='%2333ff99' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%2333ff99' stroke-opacity='.5'/%3E%3Ccircle cx='21' cy='10' r='2.5' fill='%2333ff99'/%3E%3C/svg%3E" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
   </head>
-  <body>
+  <body data-tab="radar">
     <header class="top">
-      <div class="brand"><span class="logo" aria-hidden="true">◎</span> SKYWATCH <span class="ver">v0.1</span></div>
+      <div class="brand"><span class="logo" aria-hidden="true">◎</span><span class="brand-name">SKYWATCH</span></div>
       <div class="clocks" aria-live="off">
         <span id="clock-local">--:--:--</span>
-        <span id="clock-utc" class="dim">--:--:-- UTC</span>
+        <span id="clock-utc" class="dim utc">--:--:-- UTC</span>
       </div>
       <div id="sky-state" class="sky-state"></div>
-      <button id="btn-night" class="btn" aria-pressed="false" title="Red light keeps your eyes dark-adapted">Night mode</button>
+      <button id="btn-night" class="btn night-btn" aria-pressed="false" title="Red light keeps your eyes dark-adapted">
+        <span aria-hidden="true">☾</span><span class="btn-text">Night mode</span>
+      </button>
     </header>
 
     <div id="sim-note" class="note" hidden>Simulated time from the link (<code>?t=</code>). Remove it for live time.</div>
-    <div id="loc-banner" class="note">Showing the sky over Greenwich. Set your location below to see <b>your</b> sky.</div>
-    <div id="highlight" class="highlight" hidden></div>
 
     <main class="layout">
-      <section class="panel radar-panel" aria-label="Sky radar">
-        <div class="radar-wrap"><canvas id="radar" aria-label="Sky radar: centre is straight up, edge is the horizon, north at the top"></canvas></div>
+      <section class="panel radar-panel view" data-view="radar" aria-label="Sky radar">
+        <div id="onboard" class="onboard" hidden>
+          <p><b>See your own sky.</b> You're looking at the sky over Greenwich, London.</p>
+          <div class="row">
+            <button class="btn primary big" data-action="locate">📍 Use my location</button>
+            <button class="btn big" data-action="pick-city">Pick a city</button>
+          </div>
+        </div>
+        <div id="highlight" class="highlight" hidden></div>
+        <div class="radar-wrap">
+          <canvas id="radar" aria-label="Sky radar: centre is straight up, edge is the horizon, north at the top. Pinch or scroll to zoom."></canvas>
+          <div class="radar-zoom" role="group" aria-label="Zoom">
+            <button id="zoom-in" class="btn" aria-label="Zoom in">+</button>
+            <button id="zoom-out" class="btn" aria-label="Zoom out">−</button>
+            <button id="zoom-reset" class="btn" aria-label="Show the whole sky" hidden>⟲</button>
+          </div>
+        </div>
         <div class="legend">
           <span><i class="dot visible"></i>Visible now</span>
           <span><i class="dot daylight"></i>Sunlit, sky too bright</span>
           <span><i class="dot eclipsed"></i>In Earth's shadow</span>
           <span><i class="dot planet"></i>Moon &amp; planets</span>
+          <span><i class="dot star"></i>Stars</span>
         </div>
-        <p class="hint center">Centre = straight up · edge = horizon · tap anything for details</p>
+        <p class="hint center">Centre = straight up · edge = horizon · tap anything for details · pinch to zoom</p>
         <p id="status" class="status"></p>
       </section>
 
+      <section id="wt" class="wt view" data-view="identify" aria-label="What's That? Point your phone at the sky">
+        <video id="wt-video" playsinline muted hidden></video>
+        <canvas id="wt-canvas"></canvas>
+        <div class="wt-top">
+          <span id="wt-status" class="wt-pill"></span>
+          <button id="wt-camera" class="btn wt-btn" aria-pressed="false">📷 Camera</button>
+        </div>
+        <div id="wt-start" class="wt-start">
+          <h2>What's That?</h2>
+          <p>Point your phone at a light in the sky. SkyWatch lines it up with every satellite, planet and bright star it knows about and tells you what it most likely is.</p>
+          <button id="wt-go" class="btn primary big">Start</button>
+          <p class="hint">Uses your phone's motion sensors, and the camera only if you turn it on. Nothing leaves your phone.</p>
+        </div>
+        <div class="wt-card">
+          <ol id="wt-matches" class="wt-matches"></ol>
+          <div class="row wt-actions">
+            <button id="wt-track" class="btn">Hold to track</button>
+            <button id="wt-cal" class="btn">Calibrate</button>
+          </div>
+          <p id="wt-hint" class="hint"></p>
+        </div>
+      </section>
+
       <section class="side">
-        <div class="card">
+        <div class="card view" data-view="settings">
           <h2>Location</h2>
           <p id="loc-label" class="mono"></p>
-          <div class="row">
-            <button id="btn-geo" class="btn primary">Use my location</button>
-            <form id="loc-form" class="row grow">
-              <input id="loc-input" class="input" placeholder="lat, lon  e.g. 40.71, -74.01" inputmode="decimal" aria-label="Latitude, longitude" />
-              <button class="btn">Set</button>
-            </form>
+          <p id="loc-tz" class="hint top"></p>
+          <button class="btn primary big wide" data-action="locate">📍 Use my location</button>
+          <form id="loc-form" class="row loc-form">
+            <input
+              id="loc-input"
+              class="input"
+              list="city-list"
+              placeholder="City, or lat, lon"
+              autocomplete="off"
+              enterkeyhint="go"
+              aria-label="City name, or latitude and longitude"
+            />
+            <button class="btn">Set</button>
+          </form>
+          <datalist id="city-list"></datalist>
+          <p id="loc-msg" class="hint">Your location stays in this browser.</p>
+        </div>
+
+        <div id="sheet" class="card sheet" aria-label="Selected object">
+          <div class="sheet-bar">
+            <button id="sheet-grip" class="sheet-grip" aria-label="Expand details"><i></i></button>
+            <h2>Selected</h2>
+            <button id="sheet-close" class="icon-btn sheet-close" aria-label="Close details">✕</button>
           </div>
-          <p class="hint">Your location stays in this browser.</p>
+          <div id="details" class="sheet-body"></div>
         </div>
 
-        <div class="card">
-          <h2>Selected</h2>
-          <div id="details"></div>
+        <div class="card view" data-view="passes">
+          <div class="card-head">
+            <h2>Visible passes</h2>
+            <span id="passes-count" class="dim mono"></span>
+          </div>
+          <p class="hint top">When satellites cross your sky lit by the Sun while it's dark where you are. Next 48 hours, soonest first. Tap one to see it on the radar.</p>
+          <div class="row passes-tools">
+            <label class="toggle"><input type="checkbox" id="passes-stations" /> Space stations only</label>
+            <button id="passes-ics" class="btn" disabled>📅 Add all to calendar</button>
+          </div>
+          <div id="passes-list" class="passes-list"></div>
         </div>
 
-        <div class="card">
+        <div class="card view" data-view="list">
           <div class="card-head">
             <h2>Overhead now</h2>
             <span id="overhead-count" class="dim mono"></span>
           </div>
           <label class="toggle"><input type="checkbox" id="visible-only" /> Only what I can see with my eyes</label>
           <div class="table-wrap">
-            <table class="list">
+            <table class="list overhead">
               <thead><tr><th>Name</th><th>Elev</th><th>Direction</th><th>Distance</th><th>Status</th></tr></thead>
               <tbody id="overhead-body"></tbody>
             </table>
           </div>
         </div>
 
-        <div class="card">
+        <div class="card view" data-view="list">
           <h2>Sun, Moon &amp; planets</h2>
           <table class="list">
             <thead><tr><th>Body</th><th>Elev</th><th>Direction</th><th>Bright.</th></tr></thead>
             <tbody id="sky-body"></tbody>
           </table>
+          <p class="hint">Faded rows are below the horizon right now.</p>
         </div>
 
-        <div class="card">
-          <h2>Satellite groups</h2>
+        <div class="card view" data-view="settings">
+          <h2>Display</h2>
+          <label class="toggle"><input type="checkbox" id="show-stars" /> Show bright stars</label>
+          <label class="toggle"><input type="checkbox" id="show-lines" /> Constellation lines</label>
+          <label class="toggle" id="wake-row" hidden><input type="checkbox" id="keep-awake" /> Keep the screen on while this is open</label>
+          <h2 class="gap">Satellite groups</h2>
           <div id="groups"></div>
         </div>
       </section>
     </main>
 
-    <footer class="foot">
+    <footer class="foot view" data-view="settings">
       Orbits: <a href="https://celestrak.org/" target="_blank" rel="noopener">CelesTrak</a> ·
       Math: <a href="https://github.com/shashwatak/satellite-js" target="_blank" rel="noopener">satellite.js</a>,
       <a href="https://github.com/cosinekitty/astronomy" target="_blank" rel="noopener">astronomy-engine</a> ·
+      Stars: <a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener">HYG database</a>
+      (<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>),
+      figures: <a href="https://github.com/ofrohn/d3-celestial" target="_blank" rel="noopener">d3-celestial</a> (BSD-3) ·
       Part of <a href="../">IamBored</a>
     </footer>
+
+    <nav class="tabs" aria-label="Sections">
+      <button class="tab" data-tab="radar" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" /><path d="M12 12 18.4 5.6" /></svg>
+        Radar
+      </button>
+      <button class="tab" data-tab="identify">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /><circle cx="12" cy="12" r="1" /></svg>
+        Identify
+      </button>
+      <button class="tab" data-tab="passes">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18c4-9 14-9 18 0" /><circle cx="15.5" cy="10.2" r="1.8" /><path d="M3 21h18" /></svg>
+        Passes<span id="passes-badge" class="tab-badge" hidden></span>
+      </button>
+      <button class="tab" data-tab="list">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12" /><circle cx="4" cy="6" r="1" /><circle cx="4" cy="12" r="1" /><circle cx="4" cy="18" r="1" /></svg>
+        Up now<span id="tab-badge" class="tab-badge" hidden></span>
+      </button>
+      <button class="tab" data-tab="settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>
+        Settings
+      </button>
+    </nav>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
