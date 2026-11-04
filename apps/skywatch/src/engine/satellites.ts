@@ -113,6 +113,11 @@ export interface Pass {
   /** part of the pass where it is sunlit and your sky is dark */
   visibleFrom?: Date;
   visibleTo?: Date;
+  /** where to look when the visible part starts / ends */
+  visibleFromAz?: number;
+  visibleFromEl?: number;
+  visibleToAz?: number;
+  visibleToEl?: number;
 }
 
 function elevationAt(satrec: SatRec, t: number, obs: GeodeticLocation): number {
@@ -224,14 +229,22 @@ export function predictPasses(
 function addVisibility(satrec: SatRec, observer: Observer, obs: GeodeticLocation, pass: Pass) {
   const a = pass.rise.getTime();
   const b = pass.set.getTime();
+  // quick exit: the sky stays too bright for the whole pass (most daytime passes)
+  if ([a, pass.max.getTime(), b].every((t) => sunAltitude(new Date(t), observer) > -4)) return;
   const step = Math.max(5_000, (b - a) / 120);
   for (let t = a; t <= b; t += step) {
     const d = new Date(t);
     const s = satState(satrec, d, obs, sunEci(d));
     if (!s) continue;
     if (classify(s, sunAltitude(d, observer)) === 'visible') {
-      if (!pass.visibleFrom) pass.visibleFrom = d;
+      if (!pass.visibleFrom) {
+        pass.visibleFrom = d;
+        pass.visibleFromAz = s.az;
+        pass.visibleFromEl = s.el;
+      }
       pass.visibleTo = d;
+      pass.visibleToAz = s.az;
+      pass.visibleToEl = s.el;
     }
   }
 }

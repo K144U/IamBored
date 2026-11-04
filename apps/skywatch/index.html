@@ -51,6 +51,29 @@
         <p id="status" class="status"></p>
       </section>
 
+      <section id="wt" class="wt view" data-view="identify" aria-label="What's That? Point your phone at the sky">
+        <video id="wt-video" playsinline muted hidden></video>
+        <canvas id="wt-canvas"></canvas>
+        <div class="wt-top">
+          <span id="wt-status" class="wt-pill"></span>
+          <button id="wt-camera" class="btn wt-btn" aria-pressed="false">📷 Camera</button>
+        </div>
+        <div id="wt-start" class="wt-start">
+          <h2>What's That?</h2>
+          <p>Point your phone at a light in the sky. SkyWatch lines it up with every satellite, planet and bright star it knows about and tells you what it most likely is.</p>
+          <button id="wt-go" class="btn primary big">Start</button>
+          <p class="hint">Uses your phone's motion sensors, and the camera only if you turn it on. Nothing leaves your phone.</p>
+        </div>
+        <div class="wt-card">
+          <ol id="wt-matches" class="wt-matches"></ol>
+          <div class="row wt-actions">
+            <button id="wt-track" class="btn">Hold to track</button>
+            <button id="wt-cal" class="btn">Calibrate</button>
+          </div>
+          <p id="wt-hint" class="hint"></p>
+        </div>
+      </section>
+
       <section class="side">
         <div class="card view" data-view="settings">
           <h2>Location</h2>
@@ -81,6 +104,19 @@
           <div id="details" class="sheet-body"></div>
         </div>
 
+        <div class="card view" data-view="passes">
+          <div class="card-head">
+            <h2>Visible passes</h2>
+            <span id="passes-count" class="dim mono"></span>
+          </div>
+          <p class="hint top">When satellites cross your sky lit by the Sun while it's dark where you are. Next 48 hours, soonest first. Tap one to see it on the radar.</p>
+          <div class="row passes-tools">
+            <label class="toggle"><input type="checkbox" id="passes-stations" /> Space stations only</label>
+            <button id="passes-ics" class="btn" disabled>📅 Add all to calendar</button>
+          </div>
+          <div id="passes-list" class="passes-list"></div>
+        </div>
+
         <div class="card view" data-view="list">
           <div class="card-head">
             <h2>Overhead now</h2>
@@ -95,7 +131,7 @@
           </div>
         </div>
 
-        <div class="card view" data-view="sky">
+        <div class="card view" data-view="list">
           <h2>Sun, Moon &amp; planets</h2>
           <table class="list">
             <thead><tr><th>Body</th><th>Elev</th><th>Direction</th><th>Bright.</th></tr></thead>
@@ -128,13 +164,17 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" /><path d="M12 12 18.4 5.6" /></svg>
         Radar
       </button>
+      <button class="tab" data-tab="identify">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /><circle cx="12" cy="12" r="1" /></svg>
+        Identify
+      </button>
+      <button class="tab" data-tab="passes">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18c4-9 14-9 18 0" /><circle cx="15.5" cy="10.2" r="1.8" /><path d="M3 21h18" /></svg>
+        Passes<span id="passes-badge" class="tab-badge" hidden></span>
+      </button>
       <button class="tab" data-tab="list">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12" /><circle cx="4" cy="6" r="1" /><circle cx="4" cy="12" r="1" /><circle cx="4" cy="18" r="1" /></svg>
-        Overhead<span id="tab-badge" class="tab-badge" hidden></span>
-      </button>
-      <button class="tab" data-tab="sky">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" /></svg>
-        Planets
+        Up now<span id="tab-badge" class="tab-badge" hidden></span>
       </button>
       <button class="tab" data-tab="settings">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>

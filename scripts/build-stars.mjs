@@ -58,15 +58,23 @@ async function main() {
         if (!r.ok) throw new Error(`HYG download failed: HTTP ${r.status}`);
         return r.text();
       });
-  const rows = parseCsv(csv).filter((r) => r.id !== '0' && r.mag !== '' && Number(r.mag) <= MAG_LIMIT);
+  const all = parseCsv(csv);
+  const byId = new Map(all.map((r) => [r.id, r]));
+  const rows = all.filter((r) => r.id !== '0' && r.mag !== '' && Number(r.mag) <= MAG_LIMIT);
   rows.sort((a, b) => Number(a.mag) - Number(b.mag));
+  /** a companion with no designation of its own is named after its primary: "Capella B" */
+  const label = (r) => {
+    const primary = byId.get(r.comp_primary);
+    if (!r.bayer && !r.flam && !r.hr && primary && primary !== r) return `${primary.proper || designation(primary)} B`;
+    return designation(r);
+  };
   const stars = rows.map((r) => [
     round(Number(r.ra), 5), // hours
     round(Number(r.dec), 4), // degrees
     round(Number(r.mag), 2),
     r.ci === '' ? null : round(Number(r.ci), 2), // B−V colour index
     r.proper || null,
-    designation(r),
+    label(r),
     r.con || null,
   ]);
   const doc = {

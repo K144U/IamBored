@@ -28,7 +28,11 @@ import {
 } from './engine/stars';
 import { compass, esc, fmtAgo, fmtDay, fmtDuration, fmtIn, fmtTime, fmtUtc } from './ui/format';
 import { Radar, type RadarObject } from './ui/radar';
-import type { SatSample, WorkerRequest, WorkerResponse } from './workers/propagate.worker';
+import type { Candidate } from './engine/matcher';
+import { enuFromAzEl, type Vec3 } from './engine/pointing';
+import { buildIcs, downloadIcs, type IcsEvent } from './ui/ics';
+import { WhatsThat } from './ui/whatsthat';
+import type { PassItem, SatSample, WorkerRequest, WorkerResponse } from './workers/propagate.worker';
 
 // ───────────────────────── helpers ─────────────────────────
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -136,6 +140,10 @@ worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
   const msg = e.data;
   if (msg.type === 'loaded') {
     renderGroups();
+    schedulePasses();
+  } else if (msg.type === 'passes') {
+    if (msg.reqId !== passesReq) return;
+    onPasses(msg.items);
   } else if (msg.type === 'result') {
     busy = false;
     if (msg.reqId !== reqId) return;
@@ -206,6 +214,7 @@ async function enableGroup(group: string) {
 function disableGroup(group: string) {
   data.delete(group);
   post({ type: 'unload', group });
+  schedulePasses();
   renderGroups();
 }
 
@@ -235,6 +244,218 @@ function updateRadar() {
   }
   radar.setObjects(objs);
 }
+
+// ───────────────────────── visible passes (Passes tab) ─────────────────────────
+/** groups worth scanning: bright enough to see; Starlink and new launches would swamp the list */
+const PASS_GROUPS = ['stations', 'visual'];
+const PASS_HOURS = 48;
+interface PassRow {
+  key: string;
+  norad: number;
+  name: string;
+  station: boolean;
+  pass: Pass;
+}
+let passRows: PassRow[] = [];
+let passesReq = 0;
+let passesState: 'idle' | 'computing' | 'done' = 'idle';
+let passesAt = 0;
+let passesTimer: number | undefined;
+let stationsOnly = store('passesStations', false);
+
+/** debounced: groups load one by one, and the location can change twice in a row */
+function schedulePasses() {
+  clearTimeout(passesTimer);
+  passesTimer = window.setTimeout(() => {
+    const groups = PASS_GROUPS.filter((g) => data.has(g));
+    if (!groups.length) {
+      passRows = [];
+      passesState = 'idle';
+      renderPasses();
+      return;
+    }
+    passesState = 'computing';
+    passesAt = now().getTime();
+    post({ type: 'passes', reqId: ++passesReq, time: passesAt, observer: place, hours: PASS_HOURS, groups });
+    renderPasses();
+  }, 400);
+}
+
+function onPasses(items: PassItem[]) {
+  const seen = new Set<number>();
+  passRows = [];
+  for (const { g, i, pass } of items) {
+    const omm = data.get(g)?.records[i];
+    if (!omm) continue;
+    const norad = Number(omm.NORAD_CAT_ID);
+    // the same satellite can be in two groups; keep one copy of each pass
+    const id = norad * 1e13 + pass.visibleFrom!.getTime();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    passRows.push({ key: `sat:${norad}`, norad, name: omm.OBJECT_NAME, station: g === 'stations', pass });
+  }
+  passRows.sort((a, b) => a.pass.visibleFrom!.getTime() - b.pass.visibleFrom!.getTime());
+  passesState = 'done';
+  renderPasses();
+}
+
+function visiblePassRows(t: Date) {
+  return passRows.filter((r) => r.pass.visibleTo! > t && (!stationsOnly || r.station || IMPORTANT.test(r.name)));
+}
+
+function passEvent(r: PassRow): IcsEvent {
+  const p = r.pass;
+  const from = p.visibleFrom!;
+  const to = p.visibleTo!;
+  const mins = Math.max(1, Math.round((to.getTime() - from.getTime()) / 60_000));
+  return {
+    uid: `${r.norad}-${from.getTime()}@skywatch.iambored`,
+    start: from,
+    end: to,
+    summary: `${r.name} pass, up to ${p.maxEl.toFixed(0)}°`,
+    description:
+      `Look ${compass(p.visibleFromAz ?? p.riseAz)} at ${Math.max(0, p.visibleFromEl ?? 0).toFixed(0)}° above the horizon. ` +
+      `It climbs to ${p.maxEl.toFixed(0)}° and fades in the ${compass(p.visibleToAz ?? p.setAz)} about ${mins} min later. ` +
+      `Predicted by SkyWatch for ${place.label} (${place.lat.toFixed(2)}, ${place.lon.toFixed(2)}).`,
+    alarmMinutes: 10,
+  };
+}
+
+function renderPasses() {
+  const t = now();
+  const list = visiblePassRows(t);
+  const box = $('passes-list');
+  const badge = $('passes-badge');
+  // badge: passes starting within the next 3 hours
+  const soon = list.filter((r) => r.pass.visibleFrom!.getTime() - t.getTime() < 3 * 3600_000).length;
+  badge.hidden = soon === 0;
+  badge.textContent = String(soon);
+  $<HTMLButtonElement>('passes-ics').disabled = list.length === 0;
+  $('passes-count').textContent = passesState === 'done' ? `${list.length} in ${PASS_HOURS} h` : '';
+  if (passesState === 'computing' && !list.length) {
+    box.innerHTML = '<p class="empty">Working out passes for the next 2 days…</p>';
+    return;
+  }
+  if (!list.length) {
+    box.innerHTML = `<p class="empty">${
+      passesState === 'idle'
+        ? 'Turn on "Space stations" or "Brightest" in Settings to see passes.'
+        : 'No visible passes in the next 2 days from here. Satellites are only visible in twilight or at night, when they are still in sunlight.'
+    }</p>`;
+    return;
+  }
+  let day = '';
+  const html: string[] = [];
+  list.forEach((r) => {
+    const p = r.pass;
+    const from = p.visibleFrom!;
+    const d = fmtDay(from, t);
+    if (d !== day) {
+      day = d;
+      html.push(`<h3 class="pass-day">${esc(d)}</h3>`);
+    }
+    const live = from <= t;
+    const mins = Math.max(1, Math.round((p.visibleTo!.getTime() - from.getTime()) / 60_000));
+    html.push(`<div class="pass-row${live ? ' live' : ''}${r.station || IMPORTANT.test(r.name) ? ' imp' : ''}${r.key === selected ? ' sel' : ''}" data-key="${r.key}">
+      <div class="pass-when"><b>${fmtTime(from, false)}</b><small>${live ? 'now!' : fmtIn(from.getTime() - t.getTime())}</small></div>
+      <div class="pass-what"><span class="pass-name">${esc(r.name)}</span>
+        <small>up to ${p.maxEl.toFixed(0)}° · ${compass(p.visibleFromAz ?? p.riseAz)} → ${compass(p.visibleToAz ?? p.setAz)} · ${mins} min</small></div>
+      <button class="icon-btn cal" data-cal="${passRows.indexOf(r)}" aria-label="Add ${esc(r.name)} pass to calendar">📅</button>
+    </div>`);
+  });
+  box.innerHTML = html.join('');
+}
+
+$<HTMLInputElement>('passes-stations').checked = stationsOnly;
+$('passes-stations').addEventListener('change', (e) => {
+  stationsOnly = (e.target as HTMLInputElement).checked;
+  save('passesStations', stationsOnly);
+  renderPasses();
+});
+$('passes-ics').addEventListener('click', () => {
+  const list = visiblePassRows(now());
+  if (list.length) downloadIcs('skywatch-passes.ics', buildIcs(list.map(passEvent)));
+});
+$('passes-list').addEventListener(
+  'click',
+  (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-cal]');
+    if (!btn) return;
+    e.stopPropagation(); // don't also select the row
+    const r = passRows[Number(btn.dataset.cal)];
+    if (r) downloadIcs(`skywatch-${r.norad}.ics`, buildIcs([passEvent(r)]));
+  },
+  true,
+);
+
+// ───────────────────────── What's That? ─────────────────────────
+/** apparent motion per second, as a change of the ENU unit vector */
+const velocity = (a: Vec3, b: Vec3): Vec3 => [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+
+function wtCandidates(at: Date): Candidate[] {
+  const out: Candidate[] = [];
+  const at1 = new Date(at.getTime() + 1000);
+  const obs = toGeodetic(place);
+  const [sun0, sun1] = [sunEci(at), sunEci(at1)];
+  for (const r of rows) {
+    // only satellites you could actually see now
+    if (r.status !== 'visible') continue;
+    const rec = satrecFor(r.omm);
+    const s0 = rec && satState(rec, at, obs, sun0);
+    const s1 = rec && satState(rec, at1, obs, sun1);
+    if (!s0 || !s1) continue;
+    const dir = enuFromAzEl(s0.az, s0.el);
+    out.push({ key: r.key, name: r.name, kind: 'sat', az: s0.az, el: s0.el, dir, vel: velocity(dir, enuFromAzEl(s1.az, s1.el)), important: r.important });
+  }
+  const b1 = skyBodies(at1, place);
+  skyBodies(at, place).forEach((b, i) => {
+    const dir = enuFromAzEl(b.az, b.el);
+    const kind = b.id === 'sun' ? 'sun' : b.id === 'moon' ? 'moon' : 'planet';
+    out.push({ key: `body:${b.id}`, name: b.name, kind, az: b.az, el: b.el, mag: b.mag, dir, vel: velocity(dir, enuFromAzEl(b1[i].az, b1[i].el)) });
+  });
+  const bright = stars.filter((s) => s.mag <= 3);
+  const p1 = new Map(starPositions(bright, at1, place, -5).map((p) => [p.star.id, p]));
+  for (const p of starPositions(bright, at, place, -5)) {
+    const q = p1.get(p.star.id);
+    const dir = enuFromAzEl(p.az, p.el);
+    out.push({ key: `star:${p.star.id}`, name: p.star.name, kind: 'star', az: p.az, el: p.el, mag: p.star.mag, dir, vel: q ? velocity(dir, enuFromAzEl(q.az, q.el)) : [0, 0, 0] });
+  }
+  return out;
+}
+
+/** direction of whatever is selected on the radar, so the Identify view can point the way */
+function wtTarget(at: Date): { name: string; dir: Vec3 } | null {
+  if (!selected) return null;
+  if (selected.startsWith('sat:')) {
+    const omm = selectedOmm();
+    const rec = omm && satrecFor(omm);
+    const s = rec && satState(rec, at, toGeodetic(place), sunEci(at));
+    return s && omm ? { name: omm.OBJECT_NAME, dir: enuFromAzEl(s.az, s.el) } : null;
+  }
+  if (selected.startsWith('body:')) {
+    const b = skyBodies(at, place).find((x) => `body:${x.id}` === selected);
+    return b ? { name: b.name, dir: enuFromAzEl(b.az, b.el) } : null;
+  }
+  if (selected.startsWith('star:')) {
+    const st = stars[Number(selected.slice(5))];
+    const p = st && starPositions([st], at, place, -90)[0];
+    return p ? { name: st.name, dir: enuFromAzEl(p.az, p.el) } : null;
+  }
+  return null;
+}
+
+const whatsThat = new WhatsThat({
+  now,
+  observer: () => place,
+  candidates: wtCandidates,
+  target: wtTarget,
+  show: (key) => {
+    select(key);
+    setTab('radar');
+  },
+  load: store,
+  save,
+});
 
 // ───────────────────────── stars ─────────────────────────
 function updateStars(at: Date) {
@@ -533,7 +754,7 @@ document.addEventListener('click', (e) => {
 });
 
 // ───────────────────────── tabs (phone layout) ─────────────────────────
-type Tab = 'radar' | 'list' | 'sky' | 'settings';
+type Tab = 'radar' | 'identify' | 'passes' | 'list' | 'settings';
 function setTab(tab: Tab) {
   document.body.dataset.tab = tab;
   for (const v of document.querySelectorAll<HTMLElement>('[data-view]')) v.classList.toggle('active', v.dataset.view === tab);
@@ -542,6 +763,7 @@ function setTab(tab: Tab) {
     else b.removeAttribute('aria-current');
   }
   if (phone.matches) window.scrollTo({ top: 0 });
+  whatsThat.setVisible(tab === 'identify' && phone.matches);
 }
 for (const b of document.querySelectorAll<HTMLElement>('.tab')) b.addEventListener('click', () => setTab(b.dataset.tab as Tab));
 
@@ -600,6 +822,7 @@ function setPlace(p: Place) {
   place = p;
   save('place', p);
   passCache = null;
+  schedulePasses();
   renderPlace();
   updateTrail(true);
   refreshHighlight(true);
@@ -708,6 +931,7 @@ $('btn-night').addEventListener('click', () => {
 // ───────────────────────── start ─────────────────────────
 setTab('radar');
 renderPlace();
+renderPasses();
 renderGroups();
 renderDetails();
 if (Number.isFinite(simStart)) $('sim-note').hidden = false;
@@ -717,3 +941,7 @@ for (const g of enabled) void enableGroup(g);
 tick();
 setInterval(tick, 1000);
 setInterval(() => refreshHighlight(), 60_000);
+setInterval(() => {
+  if (passesState === 'done' && now().getTime() - passesAt > 30 * 60_000) schedulePasses();
+  else renderPasses();
+}, 30_000);
