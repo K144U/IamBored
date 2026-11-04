@@ -157,7 +157,9 @@ On a phone it works like an app:
 - **Add to Home Screen** for a full-screen icon; optional **Keep the screen on** while you wait for a pass
 - Pinch, drag or double-tap the radar to zoom (up to 6×; more star names appear as you zoom); a short buzz confirms a tap (Android)
 
-**Identify ("What's That?")**: point your phone at a light in the sky.
+**Help for first-timers**: a 3-step guide on the first visit (the **?** button brings it back), a big **📷 Point at the sky** button floating on the sky map (one tap: Point tab, motion sensors and camera), plain directions in the details ("Look west-northwest, 37° up, about 4 fists above the horizon"), and plain tab names (Sky map, Point, Passes, Up now, Settings).
+
+**Point ("What's That?")**: point your phone at a light in the sky.
 - Uses the motion sensors and compass (iOS asks once), corrected for magnetic declination (WMM2025)
 - Top 3 guesses with confidence, from satellites you can see right now, the Moon, planets and stars to magnitude 3; "nothing obvious here" when nothing fits
 - **Calibrate** on the Moon, a planet or a bright star: the error circle shrinks from ±12° to ±3° (kept 12 h)

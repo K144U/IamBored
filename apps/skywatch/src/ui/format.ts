@@ -77,3 +77,26 @@ export function fmtIn(ms: number): string {
   if (h < 48) return `in ${h} h ${String(m % 60).padStart(2, '0')} min`;
   return `in ${Math.round(h / 24)} days`;
 }
+
+const WORDS = [
+  'north', 'north-northeast', 'northeast', 'east-northeast', 'east', 'east-southeast', 'southeast', 'south-southeast',
+  'south', 'south-southwest', 'southwest', 'west-southwest', 'west', 'west-northwest', 'northwest', 'north-northwest',
+];
+
+/** "west-northwest" for 292° */
+export function compassWord(az: number): string {
+  return WORDS[Math.round((((az % 360) + 360) % 360) / 22.5) % 16];
+}
+
+/**
+ * Directions a person can follow outside: "Look west-northwest, 37° up (about 4 fists above the horizon)".
+ * A fist at arm's length covers about 10° of sky.
+ */
+export function whereToLook(az: number, el: number): string {
+  if (el < 0) return `Below the horizon right now (towards the ${compassWord(az)})`;
+  if (el > 80) return 'Almost straight overhead';
+  const fists = Math.round(el / 10);
+  const height =
+    el < 5 ? 'just above the horizon' : fists <= 1 ? 'about a fist above the horizon' : `about ${fists} fists above the horizon`;
+  return `Look ${compassWord(az)}, ${Math.round(el)}° up (${height})`;
+}

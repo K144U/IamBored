@@ -22,6 +22,7 @@
         <span id="clock-utc" class="dim utc">--:--:-- UTC</span>
       </div>
       <div id="sky-state" class="sky-state"></div>
+      <button id="btn-help" class="btn help-btn" aria-label="How SkyWatch works" title="How this works">?</button>
       <button id="btn-night" class="btn night-btn" aria-pressed="false" title="Red light keeps your eyes dark-adapted">
         <span aria-hidden="true">☾</span><span class="btn-text">Night mode</span>
       </button>
@@ -47,14 +48,15 @@
             <button id="zoom-reset" class="btn" aria-label="Show the whole sky" hidden>⟲</button>
           </div>
         </div>
+        <button id="btn-point" class="point-fab" type="button">📷 Point at the sky</button>
         <div class="legend">
-          <span><i class="dot visible"></i>Visible now</span>
-          <span><i class="dot daylight"></i>Sunlit, sky too bright</span>
-          <span><i class="dot eclipsed"></i>In Earth's shadow</span>
+          <span><i class="dot visible"></i>Satellite you can see now</span>
+          <span><i class="dot daylight"></i>Satellite, sky too bright</span>
+          <span><i class="dot eclipsed"></i>Satellite in Earth's shadow</span>
           <span><i class="dot planet"></i>Moon &amp; planets</span>
           <span><i class="dot star"></i>Stars</span>
         </div>
-        <p class="hint center">Centre = straight up · edge = horizon · tap anything for details · pinch to zoom</p>
+        <p class="hint center">The circle is your whole sky: the middle is straight up, the edge is the horizon. Tap a dot to see what it is.</p>
         <p id="status" class="status"></p>
       </section>
 
@@ -63,19 +65,19 @@
         <canvas id="wt-canvas"></canvas>
         <div class="wt-top">
           <span id="wt-status" class="wt-pill"></span>
-          <button id="wt-camera" class="btn wt-btn" aria-pressed="false">📷 Camera</button>
+          <button id="wt-camera" class="btn wt-btn" aria-pressed="false">📷 Camera off</button>
         </div>
         <div id="wt-start" class="wt-start">
-          <h2>What's That?</h2>
-          <p>Point your phone at a light in the sky. SkyWatch lines it up with every satellite, planet and bright star it knows about and tells you what it most likely is.</p>
-          <button id="wt-go" class="btn primary big">Start</button>
-          <p class="hint">Uses your phone's motion sensors, and the camera only if you turn it on. Nothing leaves your phone.</p>
+          <h2>Point at the sky</h2>
+          <p>Hold your phone up as if you were taking a photo of a light in the sky. SkyWatch tells you what it most likely is: a satellite, a planet, a star or the Moon.</p>
+          <button id="wt-go" class="btn primary big">📷 Start</button>
+          <p class="hint">Your phone will ask to use its motion sensors and camera. The picture never leaves your phone.</p>
         </div>
         <div class="wt-card">
           <ol id="wt-matches" class="wt-matches"></ol>
           <div class="row wt-actions">
-            <button id="wt-track" class="btn">Hold to track</button>
-            <button id="wt-cal" class="btn">Calibrate</button>
+            <button id="wt-track" class="btn" title="Hold this while you follow a moving light with the phone">✋ Hold &amp; follow it</button>
+            <button id="wt-cal" class="btn" title="Point at the Moon, a planet or a bright star first">🧭 Fix compass</button>
           </div>
           <p id="wt-hint" class="hint"></p>
         </div>
@@ -172,11 +174,11 @@
     <nav class="tabs" aria-label="Sections">
       <button class="tab" data-tab="radar" aria-current="page">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" /><path d="M12 12 18.4 5.6" /></svg>
-        Radar
+        Sky map
       </button>
       <button class="tab" data-tab="identify">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /><circle cx="12" cy="12" r="1" /></svg>
-        Identify
+        Point
       </button>
       <button class="tab" data-tab="passes">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18c4-9 14-9 18 0" /><circle cx="15.5" cy="10.2" r="1.8" /><path d="M3 21h18" /></svg>
@@ -191,6 +193,33 @@
         Settings
       </button>
     </nav>
+    <div id="guide" class="guide" role="dialog" aria-modal="true" aria-labelledby="guide-title" hidden>
+      <div class="guide-card">
+        <div class="guide-step" data-step="0">
+          <div class="guide-art" aria-hidden="true">◎</div>
+          <h2 id="guide-title">This circle is your sky</h2>
+          <p>The middle is straight above you and the edge is the horizon, with north at the top. Green dots are satellites you can see right now; pink ones are the Moon and planets; white ones are stars.</p>
+          <p><b>Tap any dot</b> to see what it is and where to look.</p>
+        </div>
+        <div class="guide-step" data-step="1" hidden>
+          <div class="guide-art" aria-hidden="true">📷</div>
+          <h2>Point your phone at a light</h2>
+          <p>Seen a light and wondering what it is? Tap <b>📷 Point at the sky</b> and hold your phone up like you're taking its photo. SkyWatch names it.</p>
+          <p>If the guesses seem off, aim at the Moon or a bright planet and tap <b>🧭 Fix compass</b>.</p>
+        </div>
+        <div class="guide-step" data-step="2" hidden>
+          <div class="guide-art" aria-hidden="true">🛰️</div>
+          <h2>Catch the space station</h2>
+          <p><b>Passes</b> lists when the ISS and other bright satellites cross your sky after dark, with a countdown. Tap 📅 to put one in your calendar.</p>
+          <p>First, tell SkyWatch where you are in <b>Settings</b> (or with the button on the sky map).</p>
+        </div>
+        <div class="guide-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="row guide-actions">
+          <button id="guide-skip" class="btn">Skip</button>
+          <button id="guide-next" class="btn primary">Next</button>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

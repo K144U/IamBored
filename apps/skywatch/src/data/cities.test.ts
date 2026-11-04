@@ -63,3 +63,15 @@ describe('time zones', async () => {
     expect(nearestCity(-48, -120)).toBeNull(); // South Pacific
   });
 });
+
+describe('where to look', async () => {
+  const { compassWord, whereToLook } = await import('../ui/format');
+  it('speaks plainly', () => {
+    expect(compassWord(292)).toBe('west-northwest');
+    expect(compassWord(359)).toBe('north');
+    expect(whereToLook(292, 37)).toBe('Look west-northwest, 37° up (about 4 fists above the horizon)');
+    expect(whereToLook(90, 3)).toBe('Look east, 3° up (just above the horizon)');
+    expect(whereToLook(180, 85)).toBe('Almost straight overhead');
+    expect(whereToLook(10, -5)).toMatch(/^Below the horizon/);
+  });
+});

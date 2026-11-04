@@ -16,6 +16,8 @@ const env = {
   ...process.env,
   VITE_HOME_NAME: process.env.HOME_NAME ?? 'kittu.pro',
   VITE_HOME_URL: process.env.HOME_URL ?? '/',
+  // LoopLand's "Connect with Strava": kittu.pro serves the sign-in at /api/strava (its app/api/strava route)
+  VITE_STRAVA_API: process.env.STRAVA_API ?? '/api/strava',
 };
 
 rmSync('dist-embed', { recursive: true, force: true });
