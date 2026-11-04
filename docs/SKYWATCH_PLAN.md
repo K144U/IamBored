@@ -69,7 +69,7 @@ It should feel like a hacker-style mission-control screen, but be simple enough 
 /
 ├─ README.md
 ├─ docs/
-│  ├─ PLAN.md            ← this file
+│  ├─ SKYWATCH_PLAN.md   ← this file
 │  ├─ IDEAS.md           ← brainstorm backlog
 │  └─ ACCURACY.md        ← validation results (later)
 ├─ app/                  ← the SkyWatch web app (Vite project)

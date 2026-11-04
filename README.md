@@ -123,7 +123,7 @@ The weak link is **the phone's compass**, not the data. Here is the error from e
 
 ## Roadmap
 
-> 📋 Full detailed plan: [docs/PLAN.md](docs/PLAN.md) · 💡 Other project ideas: [docs/IDEAS.md](docs/IDEAS.md)
+> 📋 Full detailed plan: [docs/SKYWATCH_PLAN.md](docs/SKYWATCH_PLAN.md) · 🏃 LoopLand (real-life Paper.io): [docs/LOOPLAND_PLAN.md](docs/LOOPLAND_PLAN.md) · 💡 Other project ideas: [docs/IDEAS.md](docs/IDEAS.md)
 
 - [ ] **v0.1:** Static page that fetches TLEs and shows a "what's overhead now" list and a sky radar
 - [ ] **v0.2:** Pass predictions and visibility (sunlit and dark sky)
