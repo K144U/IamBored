@@ -1,7 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { Body, DefineStar, Equator, Horizon, Observer as AObserver } from 'astronomy-engine';
 import { describe, expect, it } from 'vitest';
-import { bvToRgb, CONSTELLATIONS, parseCatalog, starMagLimit, starPositions, type StarCatalogFile } from './stars';
+import {
+  bvToRgb,
+  CONSTELLATIONS,
+  figureLines,
+  parseCatalog,
+  parseConstellations,
+  starMagLimit,
+  starPositions,
+  type ConstellationFile,
+  type StarCatalogFile,
+} from './stars';
 
 const doc = JSON.parse(
   readFileSync(new URL('../../public/data/stars.json', import.meta.url), 'utf8'),
@@ -93,5 +103,33 @@ describe('constellations', () => {
   it('names every constellation used by the catalogue', () => {
     expect(Object.keys(CONSTELLATIONS)).toHaveLength(88);
     for (const s of stars) if (s.con) expect(CONSTELLATIONS[s.con], s.con).toBeDefined();
+  });
+});
+
+describe('constellation figures', () => {
+  const figDoc = JSON.parse(
+    readFileSync(new URL('../../public/data/constellations.json', import.meta.url), 'utf8'),
+  ) as ConstellationFile;
+  const figures = parseConstellations(figDoc);
+
+  it('covers the constellations and carries its licence', () => {
+    expect(new Set(figures.map((f) => f.id)).size).toBeGreaterThanOrEqual(88);
+    expect(figDoc.license).toMatch(/BSD/);
+  });
+
+  it("Orion's figure passes through Betelgeuse and Rigel", () => {
+    const ori = figures.find((f) => f.id === 'Ori')!;
+    const pts = ori.lines.flat();
+    for (const name of ['Betelgeuse', 'Rigel']) {
+      const s = byName(name);
+      const best = Math.min(...pts.map((p) => Math.acos(Math.min(1, p[0] * s.x + p[1] * s.y + p[2] * s.z)) * (180 / Math.PI)));
+      expect(best).toBeLessThan(0.05);
+    }
+  });
+
+  it('only returns lines that reach above the horizon', () => {
+    const lines = figureLines(figures, new Date('2026-01-15T23:00:00Z'), london);
+    expect(lines.length).toBeGreaterThan(50);
+    expect(lines.every((l) => l.some((p) => p.el > 0))).toBe(true);
   });
 });

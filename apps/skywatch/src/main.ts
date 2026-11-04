@@ -1,7 +1,7 @@
 import './style.css';
 import type { OMMJsonObject, SatRec } from 'satellite.js';
 import { GROUPS, loadGroup, type GroupData } from './data/celestrak';
-import { CITIES, cityLabel, findCity, parseLatLon } from './data/cities';
+import { CITIES, cityLabel, findCity, nearestCity, parseLatLon } from './data/cities';
 import {
   classify,
   ommEpochAgeDays,
@@ -19,14 +19,18 @@ import { skyBodies, skyState, sunAltitude, type BodyPosition } from './engine/sk
 import {
   bvToRgb,
   CONSTELLATIONS,
+  figureLines,
   parseCatalog,
+  parseConstellations,
+  type ConstellationFile,
+  type Figure,
   starMagLimit,
   starPositions,
   type Star,
   type StarCatalogFile,
   type StarPosition,
 } from './engine/stars';
-import { compass, esc, fmtAgo, fmtDay, fmtDuration, fmtIn, fmtTime, fmtUtc } from './ui/format';
+import { compass, esc, fmtAgo, fmtDay, fmtDuration, fmtIn, fmtTime, fmtUtc, setTimeZone, tzName } from './ui/format';
 import { Radar, type RadarObject } from './ui/radar';
 import type { Candidate } from './engine/matcher';
 import { enuFromAzEl, type Vec3 } from './engine/pointing';
@@ -78,14 +82,15 @@ async function syncClock() {
 }
 
 // ───────────────────────── location ─────────────────────────
-type Place = Observer & { label: string };
-const DEFAULT_PLACE: Place = { lat: 51.4769, lon: -0.0005, heightM: 45, label: 'Greenwich (default)' };
+/** `tz`: IANA time zone for showing times; missing = this device's zone */
+type Place = Observer & { label: string; tz?: string };
+const DEFAULT_PLACE: Place = { lat: 51.4769, lon: -0.0005, heightM: 45, label: 'Greenwich (default)', tz: 'Europe/London' };
 
 function initialPlace(): Place {
   const lat = Number(params.get('lat'));
   const lon = Number(params.get('lon'));
   if (params.has('lat') && params.has('lon') && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
-    return { lat, lon, heightM: 0, label: 'From link' };
+    return { lat, lon, heightM: 0, label: 'From link', tz: nearestCity(lat, lon)?.tz };
   }
   return store<Place>('place', DEFAULT_PLACE);
 }
@@ -118,8 +123,8 @@ let visibleOnly = store('visibleOnly', false);
 let showStars = store('stars', true);
 let stars: Star[] = [];
 let starsUp: StarPosition[] = [];
-/** stars this bright get a name on the radar when there is room */
-const STAR_LABEL_MAG = 1.0;
+let showLines = store('constellations', true);
+let figures: Figure[] = [];
 const satrecCache = new Map<number, SatRec | null>();
 
 const IMPORTANT = /^(ISS \(ZARYA\)|CSS \(TIANHE\)|HST)$/;
@@ -219,7 +224,17 @@ function disableGroup(group: string) {
 }
 
 // ───────────────────────── radar ─────────────────────────
-const radar = new Radar($<HTMLCanvasElement>('radar'), (key) => select(key));
+const radar = new Radar($<HTMLCanvasElement>('radar'), (key) => {
+  // a tiny tick so a tap on a busy radar feels confirmed (Android; iOS ignores it)
+  if (key && key !== selected) navigator.vibrate?.(8);
+  select(key);
+});
+radar.onZoom = (z) => {
+  $('zoom-reset').hidden = z <= 1.01;
+};
+$('zoom-in').addEventListener('click', () => radar.zoomBy(1.6));
+$('zoom-out').addEventListener('click', () => radar.zoomBy(1 / 1.6));
+$('zoom-reset').addEventListener('click', () => radar.resetZoom());
 
 function updateRadar() {
   const objs: RadarObject[] = [];
@@ -239,7 +254,8 @@ function updateRadar() {
       label: p.star.name,
       mag: p.star.mag,
       rgb: bvToRgb(p.star.bv),
-      important: p.star.mag <= STAR_LABEL_MAG && p.star.name !== p.star.designation,
+      // named stars get labels on the radar (how faint depends on the zoom)
+      important: p.star.name !== p.star.designation,
     });
   }
   radar.setObjects(objs);
@@ -448,6 +464,10 @@ const whatsThat = new WhatsThat({
   now,
   observer: () => place,
   candidates: wtCandidates,
+  lines: (at) =>
+    showLines && figures.length && starMagLimit(sunAlt) >= 3
+      ? figureLines(figures, at, place).map((l) => l.map((p) => enuFromAzEl(p.az, p.el)))
+      : [],
   target: wtTarget,
   show: (key) => {
     select(key);
@@ -466,6 +486,8 @@ function updateStars(at: Date) {
   // the brighter the sky, the fewer stars are worth drawing (a selected star always stays)
   const limit = starMagLimit(sunAlt);
   starsUp = starPositions(stars, at, place).filter((p) => p.star.mag <= limit || `star:${p.star.id}` === selected);
+  // stick figures only once the sky is dark enough to show their stars
+  radar.setLines(showLines && figures.length && limit >= 3 ? figureLines(figures, at, place) : []);
 }
 
 async function loadStars() {
@@ -477,6 +499,14 @@ async function loadStars() {
     updateRadar();
   } catch (err) {
     console.warn('Star catalogue unavailable:', err);
+  }
+  try {
+    const res = await fetch('./data/constellations.json');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    figures = parseConstellations((await res.json()) as ConstellationFile);
+    updateStars(now());
+  } catch (err) {
+    console.warn('Constellation figures unavailable:', err);
   }
 }
 
@@ -699,7 +729,14 @@ function renderStatus() {
 }
 
 function renderPlace() {
+  // places saved before time zones existed: recover the zone from a city label
+  const tz = place.tz ?? (place.label.includes(', ') ? findCity(place.label)?.tz : undefined);
+  setTimeZone(tz);
   $('loc-label').textContent = `${place.label} · ${place.lat.toFixed(3)}°, ${place.lon.toFixed(3)}°`;
+  $('loc-tz').textContent = tz
+    ? `Times are shown in local time there (${tzName(now())}).`
+    : "Times are shown in this device's time zone.";
+  $('clock-local').title = tz ? `Local time at ${place.label}` : 'Your device time';
   $('onboard').hidden = place.label !== DEFAULT_PLACE.label;
 }
 
@@ -809,6 +846,13 @@ $('visible-only').addEventListener('change', (e) => {
   renderOverhead();
 });
 
+$<HTMLInputElement>('show-lines').checked = showLines;
+$('show-lines').addEventListener('change', (e) => {
+  showLines = (e.target as HTMLInputElement).checked;
+  save('constellations', showLines);
+  updateStars(now());
+});
+
 $<HTMLInputElement>('show-stars').checked = showStars;
 $('show-stars').addEventListener('change', (e) => {
   showStars = (e.target as HTMLInputElement).checked;
@@ -872,8 +916,8 @@ $('loc-form').addEventListener('submit', (e) => {
   const text = input.value;
   const ll = parseLatLon(text);
   const city = ll ? null : findCity(text);
-  if (ll) setPlace({ ...ll, heightM: 0, label: 'Custom' });
-  else if (city) setPlace({ lat: city.lat, lon: city.lon, heightM: 0, label: cityLabel(city) });
+  if (ll) setPlace({ ...ll, heightM: 0, label: 'Custom', tz: nearestCity(ll.lat, ll.lon)?.tz });
+  else if (city) setPlace({ lat: city.lat, lon: city.lon, heightM: 0, label: cityLabel(city), tz: city.tz });
   else return locMsg('Not found. Try a big city nearby, or type latitude, longitude (e.g. 40.71, -74.01).', true);
   input.value = '';
   input.blur();

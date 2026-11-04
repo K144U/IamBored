@@ -36,3 +36,30 @@ describe('countdown', () => {
     expect(fmtIn(3 * 86_400_000)).toBe('in 3 days');
   });
 });
+
+describe('time zones', async () => {
+  const { setTimeZone, fmtDay, fmtTime, tzName, timeZone } = await import('../ui/format');
+  const { nearestCity } = await import('./cities');
+
+  it('every city has a valid IANA zone', () => {
+    for (const c of CITIES) expect(() => new Intl.DateTimeFormat('en', { timeZone: c.tz })).not.toThrow();
+  });
+
+  it('formats in the observer zone, including the day boundary', () => {
+    const t = new Date('2019-06-05T17:30:00Z'); // 02:30 next day in Tokyo, 13:30 in New York
+    setTimeZone('Asia/Tokyo');
+    expect(fmtTime(t, false)).toMatch(/02:30|2:30/);
+    expect(fmtDay(t, new Date('2019-06-05T10:00:00Z'))).toBe('Tomorrow');
+    expect(tzName(t)).toMatch(/GMT\+9|JST/);
+    setTimeZone('America/New_York');
+    expect(fmtDay(t, new Date('2019-06-05T10:00:00Z'))).toBe('Today');
+    setTimeZone('Not/AZone');
+    expect(timeZone()).toBeUndefined();
+    setTimeZone(undefined);
+  });
+
+  it('guesses a zone from the nearest city, but not in the middle of nowhere', () => {
+    expect(nearestCity(39.95, 116.3)?.tz).toBe('Asia/Shanghai');
+    expect(nearestCity(-48, -120)).toBeNull(); // South Pacific
+  });
+});

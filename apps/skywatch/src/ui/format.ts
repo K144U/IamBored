@@ -4,16 +4,45 @@ export function compass(az: number): string {
   return POINTS[Math.round((((az % 360) + 360) % 360) / 22.5) % 16];
 }
 
-export function fmtTime(d: Date, seconds = true): string {
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', ...(seconds ? { second: '2-digit' } : {}) });
+// Times are shown in the observer's time zone (a city's zone, or the device's when unknown),
+// so "Tomorrow 05:42" means 05:42 where you'll be standing.
+let zone: string | undefined;
+
+/** IANA zone such as "Asia/Tokyo"; undefined = this device's zone. Invalid names are ignored. */
+export function setTimeZone(tz?: string) {
+  try {
+    if (tz) new Intl.DateTimeFormat('en', { timeZone: tz });
+    zone = tz;
+  } catch {
+    zone = undefined;
+  }
 }
 
+export const timeZone = () => zone;
+
+/** Short zone name for display, e.g. "GMT+9" or "PST". */
+export function tzName(d: Date): string {
+  const part = new Intl.DateTimeFormat([], { timeZone: zone, timeZoneName: 'short' })
+    .formatToParts(d)
+    .find((p) => p.type === 'timeZoneName');
+  return part?.value ?? '';
+}
+
+export function fmtTime(d: Date, seconds = true): string {
+  return d.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(seconds ? { second: '2-digit' } : {}),
+    timeZone: zone,
+  });
+}
+
+const dayKey = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: zone });
+
 export function fmtDay(d: Date, ref: Date): string {
-  const same = d.toDateString() === ref.toDateString();
-  if (same) return 'Today';
-  const tomorrow = new Date(ref.getTime() + 86_400_000);
-  if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
-  return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+  if (dayKey(d) === dayKey(ref)) return 'Today';
+  if (dayKey(d) === dayKey(new Date(ref.getTime() + 86_400_000))) return 'Tomorrow';
+  return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', timeZone: zone });
 }
 
 export function fmtUtc(d: Date): string {

@@ -57,26 +57,77 @@ export function parseCatalog(doc: StarCatalogFile): Star[] {
   });
 }
 
+type Matrix = number[][];
+
+/** J2000 equator → observer's horizon (precession, nutation, Earth rotation), for one moment. */
+export function horizonMatrix(date: Date, observer: Observer): Matrix {
+  return Rotation_EQJ_HOR(date, new AObserver(observer.lat, observer.lon, observer.heightM)).rot;
+}
+
+/** Rotate one J2000 unit vector to azimuth/elevation (with standard refraction). */
+export function toAzEl(m: Matrix, x: number, y: number, z: number): { az: number; el: number } {
+  // astronomy-engine stores rotations so that out_i = Σ_j rot[j][i] · in_j.
+  // Horizontal frame: x = north, y = west, z = zenith.
+  const n = m[0][0] * x + m[1][0] * y + m[2][0] * z;
+  const w = m[0][1] * x + m[1][1] * y + m[2][1] * z;
+  const up = m[0][2] * x + m[1][2] * y + m[2][2] * z;
+  const geo = Math.asin(Math.max(-1, Math.min(1, up))) / RAD;
+  // refraction is skipped deep below the horizon, where it is meaningless
+  const el = geo > -5 ? geo + Refraction('normal', geo) : geo;
+  let az = Math.atan2(-w, n) / RAD;
+  if (az < 0) az += 360;
+  return { az, el };
+}
+
 /**
  * Horizontal positions of the stars at `date`, with standard refraction.
  * Stars below `minEl` (degrees) are dropped.
  */
 export function starPositions(stars: Star[], date: Date, observer: Observer, minEl = 0): StarPosition[] {
-  const m = Rotation_EQJ_HOR(date, new AObserver(observer.lat, observer.lon, observer.heightM)).rot;
+  const m = horizonMatrix(date, observer);
   const out: StarPosition[] = [];
   for (const s of stars) {
-    // astronomy-engine stores rotations so that out_i = Σ_j rot[j][i] · in_j.
-    // Horizontal frame: x = north, y = west, z = zenith.
-    const n = m[0][0] * s.x + m[1][0] * s.y + m[2][0] * s.z;
-    const w = m[0][1] * s.x + m[1][1] * s.y + m[2][1] * s.z;
-    const up = m[0][2] * s.x + m[1][2] * s.y + m[2][2] * s.z;
-    const geo = Math.asin(Math.max(-1, Math.min(1, up))) / RAD;
-    // refraction is skipped deep below the horizon, where it is meaningless
-    const el = geo > -5 ? geo + Refraction('normal', geo) : geo;
-    if (el < minEl) continue;
-    let az = Math.atan2(-w, n) / RAD;
-    if (az < 0) az += 360;
-    out.push({ star: s, az, el });
+    const { az, el } = toAzEl(m, s.x, s.y, s.z);
+    if (el >= minEl) out.push({ star: s, az, el });
+  }
+  return out;
+}
+
+// ───────────────────────── constellation stick figures ─────────────────────────
+
+/** Shape of constellations.json, see scripts/build-constellations.mjs. */
+export interface ConstellationFile {
+  license: string;
+  figures: { id: string; lines: [number, number][][] }[];
+}
+
+export interface Figure {
+  /** IAU abbreviation */
+  id: string;
+  /** polylines of J2000 unit vectors */
+  lines: [number, number, number][][];
+}
+
+const unit = (raH: number, dec: number): [number, number, number] => {
+  const ra = raH * 15 * RAD;
+  const d = dec * RAD;
+  return [Math.cos(d) * Math.cos(ra), Math.cos(d) * Math.sin(ra), Math.sin(d)];
+};
+
+export function parseConstellations(doc: ConstellationFile): Figure[] {
+  if (!Array.isArray(doc?.figures)) throw new Error('Bad constellation file');
+  return doc.figures.map((f) => ({ id: f.id, lines: f.lines.map((l) => l.map(([ra, dec]) => unit(ra, dec))) }));
+}
+
+/** Stick figures as az/el polylines for the radar. Lines entirely below the horizon are dropped. */
+export function figureLines(figures: Figure[], date: Date, observer: Observer): { az: number; el: number }[][] {
+  const m = horizonMatrix(date, observer);
+  const out: { az: number; el: number }[][] = [];
+  for (const f of figures) {
+    for (const line of f.lines) {
+      const pts = line.map(([x, y, z]) => toAzEl(m, x, y, z));
+      if (pts.some((p) => p.el > 0)) out.push(pts);
+    }
   }
   return out;
 }

@@ -19,6 +19,7 @@
   --planet: #ffb0e0;
   --select: #ffe14d;
   --star-tint: ;
+  --constellation: rgba(140, 175, 220, 0.3);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --tabs-h: 60px;
 }
@@ -44,6 +45,7 @@
   --planet: #ff7aa8;
   --select: #ffb0b0;
   --star-tint: #ff6b6b;
+  --constellation: rgba(255, 70, 70, 0.28);
 }
 
 * {
@@ -244,7 +246,34 @@ button.link {
 canvas {
   display: block;
   cursor: crosshair;
-  touch-action: manipulation;
+  touch-action: none; /* the radar handles pinch and drag itself */
+}
+
+.radar-wrap {
+  position: relative;
+}
+
+.radar-zoom {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.radar-zoom .btn {
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+}
+
+.radar-zoom .btn[hidden] {
+  display: none;
 }
 
 .legend {

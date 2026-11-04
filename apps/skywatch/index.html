@@ -39,7 +39,14 @@
           </div>
         </div>
         <div id="highlight" class="highlight" hidden></div>
-        <div class="radar-wrap"><canvas id="radar" aria-label="Sky radar: centre is straight up, edge is the horizon, north at the top"></canvas></div>
+        <div class="radar-wrap">
+          <canvas id="radar" aria-label="Sky radar: centre is straight up, edge is the horizon, north at the top. Pinch or scroll to zoom."></canvas>
+          <div class="radar-zoom" role="group" aria-label="Zoom">
+            <button id="zoom-in" class="btn" aria-label="Zoom in">+</button>
+            <button id="zoom-out" class="btn" aria-label="Zoom out">−</button>
+            <button id="zoom-reset" class="btn" aria-label="Show the whole sky" hidden>⟲</button>
+          </div>
+        </div>
         <div class="legend">
           <span><i class="dot visible"></i>Visible now</span>
           <span><i class="dot daylight"></i>Sunlit, sky too bright</span>
@@ -47,7 +54,7 @@
           <span><i class="dot planet"></i>Moon &amp; planets</span>
           <span><i class="dot star"></i>Stars</span>
         </div>
-        <p class="hint center">Centre = straight up · edge = horizon · tap anything for details</p>
+        <p class="hint center">Centre = straight up · edge = horizon · tap anything for details · pinch to zoom</p>
         <p id="status" class="status"></p>
       </section>
 
@@ -78,6 +85,7 @@
         <div class="card view" data-view="settings">
           <h2>Location</h2>
           <p id="loc-label" class="mono"></p>
+          <p id="loc-tz" class="hint top"></p>
           <button class="btn primary big wide" data-action="locate">📍 Use my location</button>
           <form id="loc-form" class="row loc-form">
             <input
@@ -143,6 +151,7 @@
         <div class="card view" data-view="settings">
           <h2>Display</h2>
           <label class="toggle"><input type="checkbox" id="show-stars" /> Show bright stars</label>
+          <label class="toggle"><input type="checkbox" id="show-lines" /> Constellation lines</label>
           <label class="toggle" id="wake-row" hidden><input type="checkbox" id="keep-awake" /> Keep the screen on while this is open</label>
           <h2 class="gap">Satellite groups</h2>
           <div id="groups"></div>
@@ -155,7 +164,8 @@
       Math: <a href="https://github.com/shashwatak/satellite-js" target="_blank" rel="noopener">satellite.js</a>,
       <a href="https://github.com/cosinekitty/astronomy" target="_blank" rel="noopener">astronomy-engine</a> ·
       Stars: <a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener">HYG database</a>
-      (<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>) ·
+      (<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>),
+      figures: <a href="https://github.com/ofrohn/d3-celestial" target="_blank" rel="noopener">d3-celestial</a> (BSD-3) ·
       Part of <a href="../">IamBored</a>
     </footer>
 

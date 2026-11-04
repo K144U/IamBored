@@ -36,6 +36,8 @@ export interface WhatsThatDeps {
   observer(): Observer;
   /** everything worth matching right now (with apparent motion) */
   candidates(at: Date): Candidate[];
+  /** constellation stick figures as ENU polylines (empty when off or too bright) */
+  lines(at: Date): Vec3[][];
   /** the object selected on the radar, so the view can point the way to it */
   target(at: Date): { name: string; dir: Vec3 } | null;
   show(key: string): void;
@@ -70,6 +72,7 @@ export class WhatsThat {
   private dragAz = 180;
   private dragEl = 25;
   private cands: Candidate[] = [];
+  private figs: Vec3[][] = [];
   private candsAt = 0;
   private result: ScoreResult = { matches: [], nothingObvious: true };
   private tracking: { t: number; v: Vec3 }[] | null = null;
@@ -357,6 +360,7 @@ export class WhatsThat {
     const nowMs = performance.now();
     if (nowMs - this.candsAt > 500) {
       this.cands = this.deps.candidates(at);
+      this.figs = this.deps.lines(at);
       this.candsAt = nowMs;
     }
     const fr = this.frame(at);
@@ -401,6 +405,25 @@ export class WhatsThat {
       const p = P(enuFromAzEl(az, 0));
       if (p) ctx.fillText(compass(az), p.x, p.y + 14);
     }
+
+    // constellation figures
+    ctx.strokeStyle = col('--constellation');
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const line of this.figs) {
+      let pen = false;
+      for (const v of line) {
+        const p = P(v);
+        if (!p) {
+          pen = false;
+          continue;
+        }
+        if (pen) ctx.lineTo(p.x, p.y);
+        else ctx.moveTo(p.x, p.y);
+        pen = true;
+      }
+    }
+    ctx.stroke();
 
     // objects
     const top = new Set(this.result.matches.map((m) => m.c.key));
