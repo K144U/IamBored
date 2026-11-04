@@ -11,6 +11,7 @@ Plans and the idea backlog are in [`docs/`](docs/):
 - [SKYWATCH_PLAN.md](docs/SKYWATCH_PLAN.md)
 - [LOOPLAND_PLAN.md](docs/LOOPLAND_PLAN.md)
 - [IDEAS.md](docs/IDEAS.md) (FlagRun, the CTF IRL idea, is parked here)
+- [HANDOVER.md](docs/HANDOVER.md): current state and next steps, for whoever (or whichever Claude session) picks this up next
 
 ## Run locally
 ```bash
