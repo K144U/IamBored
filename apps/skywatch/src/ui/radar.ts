@@ -3,7 +3,7 @@ import type { SatStatus } from '../engine/satellites';
 
 export interface RadarObject {
   key: string;
-  kind: 'sat' | 'body';
+  kind: 'sat' | 'body' | 'star';
   az: number;
   el: number;
   label?: string;
@@ -12,6 +12,8 @@ export interface RadarObject {
   important?: boolean;
   symbol?: string;
   mag?: number;
+  /** star colour as "r,g,b" (from its B−V index) */
+  rgb?: string;
 }
 
 interface Theme {
@@ -27,6 +29,8 @@ interface Theme {
   moon: string;
   planet: string;
   select: string;
+  /** when set (night mode), every star is drawn in this colour */
+  starTint: string;
 }
 
 function readTheme(): Theme {
@@ -45,6 +49,7 @@ function readTheme(): Theme {
     moon: v('--moon'),
     planet: v('--planet'),
     select: v('--select'),
+    starTint: v('--star-tint'),
   };
 }
 
@@ -116,17 +121,22 @@ export class Radar {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    let best: RadarObject | null = null;
-    let bestD = 16;
-    for (const o of this.objects) {
-      if (o.el < 0) continue;
-      const p = this.project(o.az, o.el);
-      const d = Math.hypot(p.x - x, p.y - y);
-      if (d < bestD) {
-        bestD = d;
-        best = o;
+    // satellites, Sun, Moon and planets win over the (many) background stars
+    const nearest = (stars: boolean, maxD: number) => {
+      let best: RadarObject | null = null;
+      let bestD = maxD;
+      for (const o of this.objects) {
+        if (o.el < 0 || (o.kind === 'star') !== stars) continue;
+        const p = this.project(o.az, o.el);
+        const d = Math.hypot(p.x - x, p.y - y);
+        if (d < bestD) {
+          bestD = d;
+          best = o;
+        }
       }
-    }
+      return best;
+    };
+    const best = nearest(false, 16) ?? nearest(true, 12);
     this.onSelect(best ? best.key : null);
   }
 
@@ -214,6 +224,21 @@ export class Radar {
       ctx.setLineDash([]);
     }
 
+    // stars: size and opacity by magnitude, tinted by colour index
+    for (const o of this.objects) {
+      if (o.kind !== 'star' || o.el < 0) continue;
+      const p = this.project(o.az, o.el);
+      const mag = o.mag ?? 4;
+      const r = Math.max(0.7, 2.4 - 0.4 * mag);
+      const alpha = Math.min(1, Math.max(0.35, 1 - mag * 0.13));
+      ctx.fillStyle = t.starTint || `rgba(${o.rgb ?? '255,255,255'},${alpha})`;
+      if (t.starTint) ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
     // satellites (dim ones first so visible ones draw on top)
     const order: Record<string, number> = { eclipsed: 0, daylight: 1, visible: 2 };
     const sats = this.objects
@@ -248,7 +273,16 @@ export class Radar {
       ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
+      // reserve the dot itself so optional star labels don't cover it
+      this.placed.push({ x: p.x - r, y: p.y - r, w: 2 * r, h: 2 * r });
       this.label(o.label ?? '', p.x, p.y, color);
+    }
+
+    // names of the brightest stars, only where there is room
+    for (const o of this.objects) {
+      if (o.kind !== 'star' || !o.important || o.el < 0 || o.key === this.selected) continue;
+      const p = this.project(o.az, o.el);
+      this.label(o.label ?? '', p.x, p.y, t.text, true);
     }
 
     // selection ring
@@ -261,11 +295,12 @@ export class Radar {
       ctx.beginPath();
       ctx.arc(p.x, p.y, 10 + pulse, 0, Math.PI * 2);
       ctx.stroke();
-      if (!sel.important && sel.kind === 'sat') this.label(sel.label ?? '', p.x, p.y, t.select);
+      if ((!sel.important && sel.kind === 'sat') || sel.kind === 'star') this.label(sel.label ?? '', p.x, p.y, t.select);
     }
   }
 
-  private label(text: string, x: number, y: number, color: string) {
+  /** `optional` labels are skipped instead of overlapping an earlier one */
+  private label(text: string, x: number, y: number, color: string, optional = false) {
     const { ctx } = this;
     ctx.font = '11px ui-monospace, Menlo, monospace';
     ctx.textAlign = 'left';
@@ -277,15 +312,20 @@ export class Radar {
       [8, 0], [8, 15], [8, -15], [-w - 8, 0], [-w - 8, 15], [-w - 8, -15], [8, 30], [8, -30],
     ];
     let [dx, dy] = spots[0];
-    for (const [sx, sy] of spots) {
+    let found = false;
+    // optional labels stay level with their dot and inside the canvas
+    for (const [sx, sy] of optional ? spots.filter(([, sy]) => sy === 0) : spots) {
       const bx = x + sx;
       const by = y + sy - h / 2;
+      if (optional && (bx < 0 || bx + w > this.size)) continue;
       const hit = this.placed.some((b) => bx < b.x + b.w && bx + w > b.x && by < b.y + b.h && by + h > b.y);
       if (!hit) {
         [dx, dy] = [sx, sy];
+        found = true;
         break;
       }
     }
+    if (optional && !found) return;
     const bx = x + dx;
     const by = y + dy - h / 2;
     this.placed.push({ x: bx, y: by, w, h });

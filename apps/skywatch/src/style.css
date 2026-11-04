@@ -18,6 +18,7 @@
   --moon: #e9eef5;
   --planet: #ffb0e0;
   --select: #ffe14d;
+  --star-tint: ;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
@@ -41,6 +42,7 @@
   --moon: #ff9e9e;
   --planet: #ff7aa8;
   --select: #ffb0b0;
+  --star-tint: #ff6b6b;
 }
 
 * {
@@ -275,6 +277,25 @@ canvas {
 }
 .dot.planet {
   background: var(--planet);
+}
+.dot.star {
+  width: 5px;
+  height: 5px;
+  margin-left: 2px;
+  background: var(--text);
+  vertical-align: 1px;
+}
+.toggle.center {
+  justify-content: center;
+  margin: 6px 0 0;
+}
+.star-chip {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: 1px;
 }
 
 .status {

@@ -4,7 +4,7 @@ Side projects and ideas built when bored. Everything runs in the browser.
 
 | Project | What | Status |
 |---|---|---|
-| 🛰️ [**SkyWatch**](apps/skywatch/) | Live sky radar: ISS, satellites, Moon and planets above you, next visible passes | v0.1 built |
+| 🛰️ [**SkyWatch**](apps/skywatch/) | Live sky radar: ISS, satellites, Moon, planets and bright stars above you, next visible passes | v0.1 + v0.4 built |
 | ⬢ [**LoopLand**](apps/loopland/) | Real-life Paper.io for runners: close a loop and the land inside is yours | v0.1 sandbox built |
 
 Plans and the idea backlog are in [`docs/`](docs/):

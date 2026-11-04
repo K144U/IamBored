@@ -15,6 +15,16 @@ import {
   type SatStatus,
 } from './engine/satellites';
 import { skyBodies, skyState, sunAltitude, type BodyPosition } from './engine/sky';
+import {
+  bvToRgb,
+  CONSTELLATIONS,
+  parseCatalog,
+  starMagLimit,
+  starPositions,
+  type Star,
+  type StarCatalogFile,
+  type StarPosition,
+} from './engine/stars';
 import { compass, esc, fmtAgo, fmtDay, fmtDuration, fmtTime, fmtUtc } from './ui/format';
 import { Radar, type RadarObject } from './ui/radar';
 import type { SatSample, WorkerRequest, WorkerResponse } from './workers/propagate.worker';
@@ -100,6 +110,11 @@ let totalTracked = 0;
 let calcMs = 0;
 let selected: string | null = null;
 let visibleOnly = store('visibleOnly', false);
+let showStars = store('stars', true);
+let stars: Star[] = [];
+let starsUp: StarPosition[] = [];
+/** stars this bright get a name on the radar when there is room */
+const STAR_LABEL_MAG = 1.0;
 const satrecCache = new Map<number, SatRec | null>();
 
 const IMPORTANT = /^(ISS \(ZARYA\)|CSS \(TIANHE\)|HST)$/;
@@ -155,6 +170,7 @@ function onSamples(samples: SatSample[], at: Date) {
   out.sort((a, b) => b.el - a.el);
   rows = out;
   bodies = skyBodies(at, place);
+  updateStars(at);
   updateRadar();
   renderOverhead();
   renderSky();
@@ -204,7 +220,42 @@ function updateRadar() {
   for (const b of bodies) {
     objs.push({ key: `body:${b.id}`, kind: 'body', az: b.az, el: b.el, label: b.name, symbol: b.symbol, mag: b.mag });
   }
+  for (const p of starsUp) {
+    objs.push({
+      key: `star:${p.star.id}`,
+      kind: 'star',
+      az: p.az,
+      el: p.el,
+      label: p.star.name,
+      mag: p.star.mag,
+      rgb: bvToRgb(p.star.bv),
+      important: p.star.mag <= STAR_LABEL_MAG && p.star.name !== p.star.designation,
+    });
+  }
   radar.setObjects(objs);
+}
+
+// ───────────────────────── stars ─────────────────────────
+function updateStars(at: Date) {
+  if (!showStars || !stars.length) {
+    starsUp = [];
+    return;
+  }
+  // the brighter the sky, the fewer stars are worth drawing (a selected star always stays)
+  const limit = starMagLimit(sunAlt);
+  starsUp = starPositions(stars, at, place).filter((p) => p.star.mag <= limit || `star:${p.star.id}` === selected);
+}
+
+async function loadStars() {
+  try {
+    const res = await fetch('./data/stars.json');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    stars = parseCatalog((await res.json()) as StarCatalogFile);
+    updateStars(now());
+    updateRadar();
+  } catch (err) {
+    console.warn('Star catalogue unavailable:', err);
+  }
 }
 
 let trailFor: string | null = null;
@@ -313,6 +364,23 @@ function renderDetails() {
       ${b.id === 'sun' ? '<p class="warn">Never look at the Sun directly.</p>' : ''}`;
     return;
   }
+  if (selected.startsWith('star:')) {
+    const s = stars[Number(selected.slice(5))];
+    if (!s) return;
+    const p = starPositions([s], t, place, -90)[0];
+    const con = s.con ? (CONSTELLATIONS[s.con] ?? s.con) : null;
+    box.innerHTML = `<h3><span class="star-chip" style="background:rgb(${bvToRgb(s.bv)})"></span>${esc(s.name)}</h3>
+      <dl class="kv">
+        ${s.name !== s.designation ? `<dt>Designation</dt><dd>${esc(s.designation)}</dd>` : ''}
+        ${con ? `<dt>Constellation</dt><dd>${esc(con)}</dd>` : ''}
+        <dt>Direction</dt><dd>${p.az.toFixed(1)}° ${compass(p.az)}</dd>
+        <dt>Elevation</dt><dd>${p.el.toFixed(1)}°${p.el < 0 ? ' (below horizon)' : ''}</dd>
+        <dt>Brightness</dt><dd>mag ${s.mag.toFixed(1)}</dd>
+        ${s.bv !== null ? `<dt>Colour</dt><dd>${starColourName(s.bv)} (B−V ${s.bv.toFixed(2)})</dd>` : ''}
+      </dl>
+      ${sunAlt > -6 ? '<p class="hint">The sky is still bright, so this star may be hard to see.</p>' : ''}`;
+    return;
+  }
   const omm = selectedOmm();
   const rec = omm ? satrecFor(omm) : null;
   if (!omm || !rec) {
@@ -354,6 +422,15 @@ function renderDetails() {
             .join('')}</tbody></table>`
         : '<p class="hint">No passes above 10° in the next 48 h.</p>'
     }`;
+}
+
+function starColourName(bv: number) {
+  if (bv < 0) return 'blue-white';
+  if (bv < 0.3) return 'white';
+  if (bv < 0.6) return 'yellow-white';
+  if (bv < 1.0) return 'yellow';
+  if (bv < 1.4) return 'orange';
+  return 'red-orange';
 }
 
 function renderSky() {
@@ -451,6 +528,15 @@ $('visible-only').addEventListener('change', (e) => {
   renderOverhead();
 });
 
+$<HTMLInputElement>('show-stars').checked = showStars;
+$('show-stars').addEventListener('change', (e) => {
+  showStars = (e.target as HTMLInputElement).checked;
+  save('stars', showStars);
+  if (!showStars && selected?.startsWith('star:')) select(null);
+  updateStars(now());
+  updateRadar();
+});
+
 function setPlace(p: Place) {
   place = p;
   save('place', p);
@@ -507,6 +593,7 @@ renderGroups();
 renderDetails();
 if (Number.isFinite(simStart)) $('sim-note').hidden = false;
 void syncClock();
+void loadStars();
 for (const g of enabled) void enableGroup(g);
 tick();
 setInterval(tick, 1000);

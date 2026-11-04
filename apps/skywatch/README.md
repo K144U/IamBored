@@ -128,7 +128,7 @@ The weak link is **the phone's compass**, not the data. Here is the error from e
 - [x] **v0.1:** Static page that fetches TLEs and shows a "what's overhead now" list and a sky radar *(built: see [Running it](#running-it))*
 - [x] **v0.2:** Pass predictions and visibility (sunlit and dark sky) *(built early; Web Worker included)*
 - [ ] **v0.3:** Aircraft radar layer (and a Worker proxy if CORS requires it)
-- [ ] **v0.4:** Planets, Moon and bright stars layer *(Sun, Moon and planets done; bright stars to do)*
+- [x] **v0.4:** Planets, Moon and bright stars layer *(925 stars to mag 4.5 from the HYG database; red night mode)*
 - [ ] **v0.5:** "What's That?" point & identify (sensors, calibration, matcher)
 - [ ] **v0.6:** Starlink train and flare hunter
 - [ ] **v0.7:** Sound mode (nearest aircraft plus audio classifier)
@@ -151,6 +151,7 @@ Handy URL parameters:
 
 What v0.1 does today:
 - Live polar sky radar with a sweep, satellites colored by visibility, Sun, Moon and planets
+- Bright stars (mag ≤ 4.5) tinted by colour, fading in as the sky darkens; the brightest are named, tap any star for name, constellation and brightness (toggle: "Show bright stars")
 - "Overhead now" list (tap a row or a dot to select), "only what I can see" filter
 - Selected satellite: position, altitude, speed, orbit-data age, dashed path for the next 10 min, **next passes for 48 h** with ★ visible passes
 - "Next visible ISS pass" banner
@@ -165,3 +166,5 @@ SkyWatch uses public broadcast and open data only. It tracks objects (satellites
 ## License
 
 MIT, see [LICENSE](../../LICENSE).
+
+The star catalogue `public/data/stars.json` is derived from the [HYG database](https://github.com/astronexus/HYG-Database) and is licensed **CC BY-SA 4.0**. Rebuild it with `node scripts/build-stars.mjs`.

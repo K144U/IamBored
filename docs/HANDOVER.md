@@ -1,7 +1,13 @@
 # Handover
 
-> Last updated: 2026-11-04, at the end of the first build session.
-> Branch: `claude/peaceful-wright-2tlzr7` (all work is here; `main` has only the initial commit; no PR opened yet).
+> Last updated: 2026-11-04, at the end of the second build session (SkyWatch bright stars, v0.4 done).
+> Branch: `claude/vigilant-noether-hxgibq` (continues the first session's `claude/peaceful-wright-2tlzr7`; `main` has only the initial commit; no PR opened yet).
+
+### Session log
+| # | Branch | What shipped |
+|---|---|---|
+| 1 | `claude/peaceful-wright-2tlzr7` | Plans, SkyWatch v0.1 (+ passes, worker, Sun/Moon/planets, night mode), LoopLand v0.1 sandbox |
+| 2 | `claude/vigilant-noether-hxgibq` | SkyWatch bright stars (925 stars, mag ≤ 4.5), completing v0.4 |
 
 ## 1. Context: the owner and how we got here
 - The owner was **idea hunting** for cool OSINT / hacker-style projects, then decided to build two of them. The full brainstorm is saved in `docs/IDEAS.md`.
@@ -21,6 +27,7 @@ apps/loopland/            LoopLand app (+ README with rules/code map)
 site/index.html           landing page linking both apps
 scripts/build-site.mjs    builds both apps → dist/ (+ .nojekyll)
 scripts/fetch-tle-snapshot.mjs  daily CelesTrak snapshot → apps/skywatch/public/data/tle/ (gitignored)
+scripts/build-stars.mjs   one-off HYG → apps/skywatch/public/data/stars.json (committed, CC BY-SA 4.0)
 deploy/pages.yml          GitHub Pages workflow, NOT active yet (see §5)
 docs/SKYWATCH_PLAN.md     full SkyWatch design + milestones (v0.1 ticked)
 docs/LOOPLAND_PLAN.md     full LoopLand design + milestones (v0.1 ticked)
@@ -28,7 +35,7 @@ docs/IDEAS.md             idea backlog
 ```
 
 ## 3. SkyWatch: state
-**Built:** v0.1, plus parts of v0.2 and v0.4.
+**Built:** v0.1 and v0.4, plus most of v0.2.
 - Polar radar canvas (`src/ui/radar.ts`): zenith in the center, N up, **E right** (map-style, not the "looking up" convention), rotating sweep, label collision avoidance, tap to select.
 - Data (`src/data/celestrak.ts`):
   - CelesTrak **OMM JSON** per group (`stations`, `visual`, `last-30-days`, `starlink`)
@@ -42,6 +49,13 @@ docs/IDEAS.md             idea backlog
   - status = visible / daylight (sun > −6°) / eclipsed / below
   - pass prediction: 30 s scan, then bisection for rise/set and golden-section search for the max, plus the visible window
 - Sky (`src/engine/sky.ts`): Sun, Moon (phase), Mercury…Saturn via astronomy-engine, plus twilight state.
+- Stars (`src/engine/stars.ts`, data in `public/data/stars.json`):
+  - 925 stars with mag ≤ 4.5 from HYG v4.1: RA/Dec (J2000), mag, B−V, proper name, Bayer designation ("α² Cen"), constellation. 48 KB, 18 KB gzipped, fetched once at startup; if it fails the app just has no stars.
+  - One `Rotation_EQJ_HOR` matrix per tick, then a 3×3 multiply per star, plus refraction. ~900 stars cost < 1 ms, so this runs on the main thread, not in the worker.
+  - Shown by sky brightness (`starMagLimit`): none while the Sun is above −2°, mag ≤ 1 in civil twilight, ≤ 3 in nautical, all after that. A selected star always stays.
+  - Radar: dot size and opacity by magnitude, colour from B−V (all red in night mode via `--star-tint`). Stars with mag ≤ 1 and a proper name get *optional* labels, which are skipped instead of overlapping (`label(..., optional=true)`). Clicks prefer satellites/bodies (16 px) over stars (12 px).
+  - Details panel: name, designation, constellation (88-name table in `stars.ts`), direction, elevation, mag, colour. Toggle "Show bright stars" under the legend (stored as `skywatch:stars`).
+  - HYG is **CC BY-SA 4.0**: attribution is in the footer, the JSON header and the app README. Keep it if the file changes.
 - UI (`src/main.ts`):
   - overhead table, details panel with 48 h passes, "next visible ISS pass" banner
   - location via geolocation (rounded to 3 decimals) or manual entry
@@ -49,7 +63,9 @@ docs/IDEAS.md             idea backlog
   - URL params `?lat=&lon=&t=`
 
 **Verified:**
-- 12 unit tests, including standing under the satellite giving ~90° elevation, the antipode giving < −80°, OMM ≡ TLE, and pass rise/set at 0° ± 0.1°
+- 20 unit tests, including standing under the satellite giving ~90° elevation, the antipode giving < −80°, OMM ≡ TLE, and pass rise/set at 0° ± 0.1°
+- stars: matches astronomy-engine's own `DefineStar` → `Equator` → `Horizon` within 0.01° for stars above the horizon; Polaris at elevation ≈ latitude and due north at 10°–70° latitude; catalogue sanity (Sirius first, 88 constellations)
+- star layer screenshots: London January night (Orion and Sirius due south, Capella at the zenith), Beijing twilight, London noon (no stars), red night mode, iPhone 13
 - Playwright screenshots at desktop and iPhone 13 sizes, no horizontal overflow
 - production build served from a sub-path, with the snapshot fallback exercised
 
@@ -60,17 +76,17 @@ docs/IDEAS.md             idea backlog
 
 **Known limitations:**
 - Times show in the *device's* timezone, not the observer location's.
-- No bright-star catalog yet (v0.4).
+- Stars ignore proper motion and annual aberration (~20″). Fine for a radar; revisit for v0.5 matching only if needed.
+- No constellation lines (a nice next touch: add a small stick-figure list to `stars.json`, keyed by HIP numbers).
 - Pass list is computed on the main thread (fine for one satellite).
 - The `?t=` simulated clock advances in real time; there is no speed-up.
 
 **Next (from `docs/SKYWATCH_PLAN.md`):**
-1. v0.3 aircraft layer: test CORS on adsb.lol / airplanes.live / OpenSky first.
-2. v0.4 bright stars (`public/data/stars.json`, mag ≤ 4.5).
-3. v0.5 "What's That?" (phone sensors, calibration, matcher). This is the headline feature.
-4. v0.6 Starlink trains.
-5. v0.7 sound mode.
-6. v0.8 PWA and alerts.
+1. v0.3 aircraft layer: test CORS on adsb.lol / airplanes.live / OpenSky first. **This can't be done from the cloud sandbox** (all three are 403'd by its proxy), so it needs the owner's browser or a local session.
+2. v0.5 "What's That?" (phone sensors, calibration, matcher). This is the headline feature. Stars are now available as match candidates (`starPositions`).
+3. v0.6 Starlink trains.
+4. v0.7 sound mode.
+5. v0.8 PWA and alerts (precache `stars.json` too).
 
 ## 4. LoopLand: state
 **Built:** v0.1 sandbox (no server).
@@ -131,7 +147,7 @@ docs/IDEAS.md             idea backlog
 - The owner hasn't asked for a PR yet. Ask before opening one.
 
 ## 6. Testing in the cloud sandbox
-- **Network:** `registry.npmjs.org` works. `celestrak.org`, `basemaps.cartocdn.com` and `tile.openstreetmap.org` are blocked.
+- **Network:** `registry.npmjs.org` and `raw.githubusercontent.com` work. `celestrak.org`, `basemaps.cartocdn.com`, `tile.openstreetmap.org`, `cdn.jsdelivr.net` and the flight APIs (`api.adsb.lol`, `api.airplanes.live`, `opensky-network.org`) are blocked.
 - **Playwright:** preinstalled. Run scripts with `NODE_PATH=$(npm root -g) node script.cjs`.
 - **CelesTrak in screenshots:** intercept it with `page.route('https://celestrak.org/**', …)` and fulfill with fixture OMM JSON. Abort tile requests.
 - **SkyWatch fixture:** `apps/skywatch/src/test/fixtures.ts` holds `ISS_2019`, the satellite.js README TLE as OMM, with epoch 2019-06-05.
@@ -139,6 +155,9 @@ docs/IDEAS.md             idea backlog
   - Daytime overhead pass from London: about 2019-06-05T17:14Z
 - **Busy radar:** clone the fixture with varied `RA_OF_ASC_NODE`, `MEAN_ANOMALY`, `INCLINATION` and `MEAN_MOTION` (name them `TEST-SAT n`). Use this in screenshot scripts only; never ship it.
 - **LoopLand:** click `#btn-demo` and wait about 6 s for the animation.
+- **Star scenes:** `?t=2026-01-15T23:00:00Z&lat=51.5&lon=-0.1` (London winter night: Orion, Sirius, Jupiter in Gemini) and `?t=2026-01-15T12:00:00Z&…` (noon: stars hidden).
+- **Playwright pitfall:** `locator(...).textContent()` on an element that doesn't exist waits 30 s. In polling loops use `page.evaluate(() => document.querySelector(...)?.textContent)`.
+- **Shell pitfall:** `pkill -f vite` (or any pattern that appears in your own command line) kills the tool's own shell (exit 144). Use `pgrep -af` to look first, then `kill <pid>`.
 - **Expected build warning:** Vite warns that `node:module` / `node:worker_threads` are "externalized" from satellite.js's WASM build. It's harmless: the WASM bulk API isn't used and is tree-shaken.
 - **happy-dom:** doesn't support `getElementsByTagNameNS('*', …)`. That's why `parse.ts` scans by `localName`.
 
@@ -149,11 +168,16 @@ docs/IDEAS.md             idea backlog
   - `shadowFraction(sunEciAU, satEciKm)` gives 0 (lit) to 1 (umbra)
   - `sunPos(jday(date)).rsun` is an `{x,y,z}` object (it was an array in v6)
   - `gstime(date)`
-- **astronomy-engine 2.1:** `Equator(body, date, observer, true, true)` → `Horizon(date, observer, ra, dec, 'normal')`; `Illumination(body, date).mag/.phase_fraction`.
+- **astronomy-engine 2.1:**
+  - `Equator(body, date, observer, true, true)` → `Horizon(date, observer, ra, dec, 'normal')`; `Illumination(body, date).mag/.phase_fraction`
+  - `Rotation_EQJ_HOR(date, observer).rot` is stored transposed: `out_i = Σ_j rot[j][i] · in_j`. The horizontal frame is x = north, y = **west**, z = up, so `az = atan2(−y, x)`.
+  - `Horizon(..., 'normal')` still adds ~0.57° of refraction to objects far below the horizon. Compare positions only above ~1°.
+  - `DefineStar(Body.Star1, raHours, decDeg, distLy)` makes a fixed star usable with `Equator` (handy as a test reference).
 - **h3-js 4.5:** `polygonToCells([[lat,lng]…], res)`, `cellsToMultiPolygon(cells, true)` (GeoJSON order), `gridPathCells`, `gridDisk`, `getHexagonAreaAvg(res, 'km2')`.
 
 ## 8. Open questions for the owner
-1. SkyWatch radar orientation: keep E on the right (map-style), or switch to "looking up" (E on the left) as an option?
-2. LoopLand name: keep "LoopLand"? (Alternatives are in plan §15.)
-3. Should the sandbox get a JSON export/import so friends can share a map before a server exists?
-4. Open a PR to `main` now, or keep building on the branch?
+1. SkyWatch: constellation lines on the radar, or keep it to dots and names?
+2. SkyWatch radar orientation: keep E on the right (map-style), or switch to "looking up" (E on the left) as an option?
+3. LoopLand name: keep "LoopLand"? (Alternatives are in plan §15.)
+4. Should the sandbox get a JSON export/import so friends can share a map before a server exists?
+5. Open a PR to `main` now, or keep building on the branch?

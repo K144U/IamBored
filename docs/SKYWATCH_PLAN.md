@@ -1,6 +1,6 @@
 # SkyWatch: Detailed Project Plan
 
-> Status: **v0.1 built** (plus pass predictions from v0.2 and Sun/Moon/planets from v0.4). Code: [`apps/skywatch/`](../apps/skywatch/).
+> Status: **v0.1 built** (plus pass predictions from v0.2) and **v0.4 sky bodies built**. Code: [`apps/skywatch/`](../apps/skywatch/).
 > Overview and accuracy summary: see [README](../README.md).
 
 ---
@@ -142,7 +142,7 @@ It should feel like a hacker-style mission-control screen, but be simple enough 
 
 ### 5.3 Sky bodies
 - Sun, Moon, planets: computed live with astronomy-engine. No network needed.
-- Stars: bundled `stars.json` built once from the Yale Bright Star Catalog / Hipparcos (name, RA, Dec, magnitude), limited to mag ≤ 4.5 (~900 stars, small file).
+- Stars: bundled `public/data/stars.json`, built once by `scripts/build-stars.mjs` from the HYG database v4.1 (Hipparcos + Yale BSC + Gliese; CC BY-SA 4.0): RA, Dec, magnitude, B−V colour, name, Bayer designation, constellation. 925 stars with mag ≤ 4.5, 48 KB (18 KB gzipped).
 
 ### 5.4 Location & time
 - Geolocation API, with manual entry or map click as a fallback (and for privacy).
@@ -196,7 +196,7 @@ A satellite is **naked-eye visible** when all three hold:
 
 ### 6.7 Sky bodies
 - astronomy-engine `Equator()` → `Horizon()` with refraction for the Sun, Moon and planets.
-- Stars: J2000 RA/Dec → apply precession (or ignore; ~0.35° by 2026 is borderline, so apply it) → horizon coordinates.
+- Stars (built in `src/engine/stars.ts`): J2000 unit vectors, then one `Rotation_EQJ_HOR(time, observer)` matrix per frame (precession + nutation + Earth rotation), a 3×3 multiply per star, and `Refraction('normal', el)`. Matches astronomy-engine's own `Equator()`→`Horizon()` within 0.01° (tested). Proper motion and annual aberration (~20″) are ignored.
 - Moon phase and illumination are also used as input for the sky brightness estimate.
 
 ---
@@ -389,8 +389,8 @@ Each milestone is shippable on its own.
 **Done when:** aircraft positions on the radar match a flight-tracking site within ~1°.
 
 ### v0.4: Sky bodies
-- [ ] Sun, Moon (with phase), planets, bright stars on the radar
-- [ ] Red night mode
+- [x] Sun, Moon (with phase), planets, bright stars on the radar
+- [x] Red night mode
 
 **Done when:** planet positions are within 1′ of the reference.
 
