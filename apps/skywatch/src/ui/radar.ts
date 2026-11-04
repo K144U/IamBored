@@ -136,7 +136,9 @@ export class Radar {
       }
       return best;
     };
-    const best = nearest(false, 16) ?? nearest(true, 12);
+    // fingers are less precise than a mouse pointer
+    const touch = (e as PointerEvent).pointerType === 'touch';
+    const best = nearest(false, touch ? 28 : 16) ?? nearest(true, touch ? 20 : 12);
     this.onSelect(best ? best.key : null);
   }
 

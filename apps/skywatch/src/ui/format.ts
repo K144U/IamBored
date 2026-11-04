@@ -38,3 +38,13 @@ export function fmtDuration(ms: number): string {
 export function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }
+
+/** Friendly countdown: "now", "in 4 min", "in 2 h 05 min", "in 3 days". */
+export function fmtIn(ms: number): string {
+  if (ms < 60_000) return 'now';
+  const m = Math.round(ms / 60_000);
+  if (m < 60) return `in ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `in ${h} h ${String(m % 60).padStart(2, '0')} min`;
+  return `in ${Math.round(h / 24)} days`;
+}

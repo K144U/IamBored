@@ -292,13 +292,15 @@ confidence  = score_i / Σ score
 5. **Map:** aircraft and satellite ground tracks, the user's location, the visibility footprint.
 6. **Settings:** location (auto or manual), sky quality, units, layers, alerts, calibration reset, privacy info.
 
+**Built (phone layout, < 900 px wide):** a bottom tab bar with **Radar · Overhead · Planets · Settings**, one section at a time. Tapping a dot or a list row opens a **details bottom sheet** over the radar (swipe up to expand, swipe down or ✕ to close). In landscape the radar sits at full height on the left with the details as a side panel. Desktop keeps the two-column dashboard.
+
 ### 8.2 Look & feel
 - Dark "mission control" theme: monospace data, glowing accents, scanline or grid backdrop, all subtle and readable.
 - A **red night mode** that keeps your eyes dark-adapted for stargazing.
 - Respect `prefers-reduced-motion`. Full keyboard navigation on desktop.
 
 ### 8.3 Onboarding
-1. "Where are you?" (allow location, or pick on the map)
+1. "Where are you?" (allow location, or pick on the map) *(built: first-run card with "Use my location" / "Pick a city"; an offline list of ~100 cities, so nothing typed leaves the browser)*
 2. "Want to identify things with your phone?" (sensor and camera permissions, with an explanation)
 3. A quick calibration prompt if the Moon or a bright planet is up
 
@@ -413,6 +415,7 @@ Each milestone is shippable on its own.
 - [ ] Optional YAMNet classifier (lazy-loaded)
 
 ### v0.8: PWA & alerts
+- [x] Web app manifest + icons ("Add to Home Screen" opens full-screen)
 - [ ] Service worker, offline passes, install prompt
 - [ ] ntfy alerts via Worker cron (opt-in)
 

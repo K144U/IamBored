@@ -1,13 +1,13 @@
 # Handover
 
-> Last updated: 2026-11-04, at the end of the second build session (SkyWatch bright stars, v0.4 done).
+> Last updated: 2026-11-04, at the end of the second build session (SkyWatch bright stars, v0.4 done, then the mobile-first redesign).
 > Branch: `claude/vigilant-noether-hxgibq` (continues the first session's `claude/peaceful-wright-2tlzr7`; `main` has only the initial commit; no PR opened yet).
 
 ### Session log
 | # | Branch | What shipped |
 |---|---|---|
 | 1 | `claude/peaceful-wright-2tlzr7` | Plans, SkyWatch v0.1 (+ passes, worker, Sun/Moon/planets, night mode), LoopLand v0.1 sandbox |
-| 2 | `claude/vigilant-noether-hxgibq` | SkyWatch bright stars (925 stars, mag ≤ 4.5), completing v0.4 |
+| 2 | `claude/vigilant-noether-hxgibq` | SkyWatch bright stars (925 stars, mag ≤ 4.5), completing v0.4; then a mobile-first redesign (tabs, details sheet, city picker, manifest) |
 
 ## 1. Context: the owner and how we got here
 - The owner was **idea hunting** for cool OSINT / hacker-style projects, then decided to build two of them. The full brainstorm is saved in `docs/IDEAS.md`.
@@ -49,6 +49,16 @@ docs/IDEAS.md             idea backlog
   - status = visible / daylight (sun > −6°) / eclipsed / below
   - pass prediction: 30 s scan, then bisection for rise/set and golden-section search for the max, plus the visible window
 - Sky (`src/engine/sky.ts`): Sun, Moon (phase), Mercury…Saturn via astronomy-engine, plus twilight state.
+- **Phone layout** (owner asked for "mobile-centric, easy on the phone"). Everything is CSS under `@media (max-width: 899px)` plus a little JS in `main.ts`; desktop is unchanged.
+  - Bottom tab bar (`<nav class="tabs">`). `setTab()` sets `body[data-tab]` and adds `.active` to every `[data-view="<tab>"]`; on phones `.view:not(.active)` is hidden. The details card (`#sheet`) has no `data-view`: on phones it's a fixed bottom sheet shown when `body.has-sel` (set in `select()`), only on the Radar tab. Grip/swipe toggles `.expanded`; swipe down or ✕ deselects.
+  - Tapping a row in Overhead/Planets (or the ISS "show" link) selects it and jumps to Radar.
+  - First-run card `#onboard` shows while the place is the Greenwich default. Location uses `data-action="locate"` buttons (two of them) and an inline `#loc-msg` instead of `alert()`. City search: `src/data/cities.ts` (~100 cities, accent-insensitive prefix match, tested) + `<datalist>`.
+  - Touch: radar hit radius 28 px for satellites/bodies and 20 px for stars when `pointerType === 'touch'`. Buttons/toggles/rows ≥ 44 px; inputs 16 px (iOS zooms on smaller).
+  - Header on phones: logo + name, local time, sky state (Sun altitude hidden < 480 px), icon-only night button. `viewport-fit=cover` + `env(safe-area-inset-*)` for notches and the home bar.
+  - Landscape phones (height ≤ 500 px): radar left at full height, banner + legend right, details as a right-hand side panel, compact tabs.
+  - "Keep the screen on" (Screen Wake Lock API; the row only appears where supported; re-acquired on `visibilitychange`).
+  - `public/manifest.webmanifest` + `icon.svg`, `icon-192/512.png`, `apple-touch-icon.png` (PNGs rendered from the SVG with Playwright). No service worker yet, so it is "add to home screen", not offline.
+  - Night mode also switches `<meta name="theme-color">`.
 - Stars (`src/engine/stars.ts`, data in `public/data/stars.json`):
   - 925 stars with mag ≤ 4.5 from HYG v4.1: RA/Dec (J2000), mag, B−V, proper name, Bayer designation ("α² Cen"), constellation. 48 KB, 18 KB gzipped, fetched once at startup; if it fails the app just has no stars.
   - One `Rotation_EQJ_HOR` matrix per tick, then a 3×3 multiply per star, plus refraction. ~900 stars cost < 1 ms, so this runs on the main thread, not in the worker.
@@ -65,6 +75,7 @@ docs/IDEAS.md             idea backlog
 **Verified:**
 - 20 unit tests, including standing under the satellite giving ~90° elevation, the antipode giving < −80°, OMM ≡ TLE, and pass rise/set at 0° ± 0.1°
 - stars: matches astronomy-engine's own `DefineStar` → `Equator` → `Horizon` within 0.01° for stars above the horizon; Polaris at elevation ≈ latitude and due north at 10°–70° latitude; catalogue sanity (Sirius first, 88 constellations)
+- phone flows in Playwright (iPhone 13, iPhone SE, iPhone 13 landscape, desktop 1280 px): first run → Pick a city → "tok" → Tokyo → back on Radar; ISS "show" → sheet → expand → close; list row → Radar with sheet; Planets tab; night mode. No horizontal overflow, no console errors.
 - star layer screenshots: London January night (Orion and Sirius due south, Capella at the zenith), Beijing twilight, London noon (no stars), red night mode, iPhone 13
 - Playwright screenshots at desktop and iPhone 13 sizes, no horizontal overflow
 - production build served from a sub-path, with the snapshot fallback exercised
@@ -77,9 +88,15 @@ docs/IDEAS.md             idea backlog
 **Known limitations:**
 - Times show in the *device's* timezone, not the observer location's.
 - Stars ignore proper motion and annual aberration (~20″). Fine for a radar; revisit for v0.5 matching only if needed.
+- Phone layout not yet tried on a **real** iPhone/Android (only Playwright emulation): check the sheet swipe, safe areas in "Add to Home Screen" mode, and the `<datalist>` city picker on iOS Safari.
 - No constellation lines (a nice next touch: add a small stick-figure list to `stars.json`, keyed by HIP numbers).
 - Pass list is computed on the main thread (fine for one satellite).
 - The `?t=` simulated clock advances in real time; there is no speed-up.
+
+**Recommended next (owner-facing list, agreed in session 2):**
+- Quick UX wins: a **Passes** tab (all visible passes for the ISS + brightest sats, with "add to calendar" .ics); a "what's that bright thing?" tap hint on first visit; haptic tick on select (Android); pinch-zoom on the radar.
+- Service worker (v0.8) so it opens offline at a dark site with no signal; precache `stars.json` and the last TLEs.
+- v0.5 "What's That?" is the big one, and it's phone-only by nature, so the new layout is its home: add it as a 5th tab.
 
 **Next (from `docs/SKYWATCH_PLAN.md`):**
 1. v0.3 aircraft layer: test CORS on adsb.lol / airplanes.live / OpenSky first. **This can't be done from the cloud sandbox** (all three are 403'd by its proxy), so it needs the owner's browser or a local session.
@@ -155,6 +172,7 @@ docs/IDEAS.md             idea backlog
   - Daytime overhead pass from London: about 2019-06-05T17:14Z
 - **Busy radar:** clone the fixture with varied `RA_OF_ASC_NODE`, `MEAN_ANOMALY`, `INCLINATION` and `MEAN_MOTION` (name them `TEST-SAT n`). Use this in screenshot scripts only; never ship it.
 - **LoopLand:** click `#btn-demo` and wait about 6 s for the animation.
+- **Phone screenshots:** use `devices['iPhone 13']`, `['iPhone SE']`, `['iPhone 13 landscape']`. Click `.tab[data-tab="list"]` etc. to switch sections; `#highlight button.link` selects the ISS and opens the sheet; `#sheet-grip` expands it.
 - **Star scenes:** `?t=2026-01-15T23:00:00Z&lat=51.5&lon=-0.1` (London winter night: Orion, Sirius, Jupiter in Gemini) and `?t=2026-01-15T12:00:00Z&…` (noon: stars hidden).
 - **Playwright pitfall:** `locator(...).textContent()` on an element that doesn't exist waits 30 s. In polling loops use `page.evaluate(() => document.querySelector(...)?.textContent)`.
 - **Shell pitfall:** `pkill -f vite` (or any pattern that appears in your own command line) kills the tool's own shell (exit 144). Use `pgrep -af` to look first, then `kill <pid>`.

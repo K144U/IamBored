@@ -149,7 +149,14 @@ Handy URL parameters:
 - `?lat=40.71&lon=-74.01` sets the location (not saved, nothing is written to the URL by the app)
 - `?t=2026-11-04T20:00:00Z` starts the clock at a given moment, e.g. to preview a pass
 
-What v0.1 does today:
+On a phone it works like an app:
+- Bottom tabs: **Radar**, **Overhead** (badge = satellites visible right now), **Planets**, **Settings**
+- Tap anything on the radar or a list row: a details sheet slides up (swipe up for more, swipe down or ✕ to close)
+- First visit asks where you are: **Use my location** or **Pick a city** (offline list, or type `lat, lon`)
+- "Next visible ISS pass in 2 h 05 min" countdown, big thumb-sized buttons, landscape layout
+- **Add to Home Screen** for a full-screen icon; optional **Keep the screen on** while you wait for a pass
+
+What it does today:
 - Live polar sky radar with a sweep, satellites colored by visibility, Sun, Moon and planets
 - Bright stars (mag ≤ 4.5) tinted by colour, fading in as the sky darkens; the brightest are named, tap any star for name, constellation and brightness (toggle: "Show bright stars")
 - "Overhead now" list (tap a row or a dot to select), "only what I can see" filter

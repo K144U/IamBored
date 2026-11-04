@@ -1,6 +1,7 @@
 import './style.css';
 import type { OMMJsonObject, SatRec } from 'satellite.js';
 import { GROUPS, loadGroup, type GroupData } from './data/celestrak';
+import { CITIES, cityLabel, findCity, parseLatLon } from './data/cities';
 import {
   classify,
   ommEpochAgeDays,
@@ -25,7 +26,7 @@ import {
   type StarCatalogFile,
   type StarPosition,
 } from './engine/stars';
-import { compass, esc, fmtAgo, fmtDay, fmtDuration, fmtTime, fmtUtc } from './ui/format';
+import { compass, esc, fmtAgo, fmtDay, fmtDuration, fmtIn, fmtTime, fmtUtc } from './ui/format';
 import { Radar, type RadarObject } from './ui/radar';
 import type { SatSample, WorkerRequest, WorkerResponse } from './workers/propagate.worker';
 
@@ -291,6 +292,8 @@ function selectedOmm(): OMMJsonObject | null {
 
 function select(key: string | null) {
   selected = key;
+  document.body.classList.toggle('has-sel', key !== null);
+  if (key === null) $('sheet').classList.remove('expanded');
   radar.setSelected(key);
   passCache = null;
   updateTrail(true);
@@ -324,6 +327,9 @@ function renderOverhead() {
   const list = visibleOnly ? rows.filter((r) => r.status === 'visible') : rows;
   const visibleCount = rows.filter((r) => r.status === 'visible').length;
   $('overhead-count').textContent = `${rows.length} up · ${visibleCount} visible`;
+  const badgeEl = $('tab-badge');
+  badgeEl.hidden = visibleCount === 0;
+  badgeEl.textContent = String(visibleCount);
   const body = $('overhead-body');
   if (!list.length) {
     body.innerHTML = `<tr><td colspan="5" class="empty">${
@@ -417,7 +423,7 @@ function renderDetails() {
               <td class="num">${p.maxEl.toFixed(0)}°</td>
               <td>${compass(p.riseAz)} → ${compass(p.setAz)}</td>
               <td class="num">${fmtDuration(p.set.getTime() - p.rise.getTime())}</td>
-              <td>${p.visibleFrom ? `<span class="star" title="Visible ${fmtTime(p.visibleFrom, false)}–${fmtTime(p.visibleTo!, false)}">★ visible</span>` : ''}</td></tr>`,
+              <td>${p.visibleFrom ? `<span class="star" title="Visible ${fmtTime(p.visibleFrom, false)}–${fmtTime(p.visibleTo!, false)}">★<span class="star-text"> visible</span></span>` : ''}</td></tr>`,
             )
             .join('')}</tbody></table>`
         : '<p class="hint">No passes above 10° in the next 48 h.</p>'
@@ -435,7 +441,7 @@ function starColourName(bv: number) {
 
 function renderSky() {
   const sun = bodies.find((b) => b.id === 'sun');
-  $('sky-state').textContent = sun ? `${skyState(sun.el)} · Sun ${sun.el.toFixed(0)}°` : '';
+  $('sky-state').innerHTML = sun ? `<span>${skyState(sun.el)}</span><span class="ss-sun"> · Sun ${sun.el.toFixed(0)}°</span>` : '';
   $('sky-body').innerHTML = bodies
     .map(
       (b) => `<tr data-key="body:${b.id}" class="${b.el < 0 ? 'down' : ''}${`body:${b.id}` === selected ? ' sel' : ''}">
@@ -473,14 +479,14 @@ function renderStatus() {
 
 function renderPlace() {
   $('loc-label').textContent = `${place.label} · ${place.lat.toFixed(3)}°, ${place.lon.toFixed(3)}°`;
-  $('loc-banner').hidden = place.label !== DEFAULT_PLACE.label;
+  $('onboard').hidden = place.label !== DEFAULT_PLACE.label;
 }
 
 // "Next visible ISS pass" highlight
 let highlightAt = 0;
+let highlightPass: { norad: string; pass: Pass | undefined } | null = null;
 function refreshHighlight(force = false) {
   const t = now();
-  if (!force && t.getTime() - highlightAt < 10 * 60_000) return;
   let iss: OMMJsonObject | undefined;
   for (const gd of data.values()) {
     iss = gd.records.find((r) => r.OBJECT_NAME === 'ISS (ZARYA)');
@@ -491,21 +497,74 @@ function refreshHighlight(force = false) {
     el.hidden = true;
     return;
   }
-  highlightAt = t.getTime();
-  const rec = satrecFor(iss);
-  const pass = rec ? predictPasses(rec, place, t, { hours: 72, minMaxEl: 10 }).find((p) => p.visibleFrom) : undefined;
+  // predicting 3 days of passes is the slow part: redo it every 10 min, or when the pass is over
+  const stale = highlightPass?.pass && highlightPass.pass.visibleTo! < t;
+  if (force || stale || !highlightPass || t.getTime() - highlightAt > 10 * 60_000) {
+    highlightAt = t.getTime();
+    const rec = satrecFor(iss);
+    const pass = rec ? predictPasses(rec, place, t, { hours: 72, minMaxEl: 10 }).find((p) => p.visibleFrom) : undefined;
+    highlightPass = { norad: String(iss.NORAD_CAT_ID), pass };
+  }
+  const { pass, norad } = highlightPass!;
   el.hidden = false;
   el.innerHTML = pass
-    ? `<b>Next visible ISS pass:</b> ${fmtDay(pass.visibleFrom!, t)} ${fmtTime(pass.visibleFrom!, false)}, up to ${pass.maxEl.toFixed(0)}°, ${compass(pass.riseAz)} → ${compass(pass.setAz)} <button class="link" data-key="sat:${iss.NORAD_CAT_ID}">show</button>`
+    ? `<b>${pass.visibleFrom! <= t ? 'The ISS is passing now!' : `Next visible ISS pass ${fmtIn(pass.visibleFrom!.getTime() - t.getTime())}:`}</b> ${fmtDay(pass.visibleFrom!, t)} ${fmtTime(pass.visibleFrom!, false)}, up to ${pass.maxEl.toFixed(0)}°, ${compass(pass.riseAz)} → ${compass(pass.setAz)} <button class="link" data-key="sat:${norad}">show</button>`
     : '<b>ISS:</b> no visible passes in the next 3 days from here.';
 }
 
 // ───────────────────────── events ─────────────────────────
+const phone = matchMedia('(max-width: 899px)');
+
 document.addEventListener('click', (e) => {
   const target = e.target as HTMLElement;
   const row = target.closest<HTMLElement>('[data-key]');
-  if (row && !target.closest('canvas')) select(row.dataset.key === selected && row.tagName === 'TR' ? null : row.dataset.key!);
+  if (row && !target.closest('canvas')) {
+    const key = row.dataset.key === selected && row.tagName === 'TR' && !phone.matches ? null : row.dataset.key!;
+    select(key);
+    // on a phone, show the pick on the radar with its details sheet
+    if (key && phone.matches) setTab('radar');
+  }
+  const action = target.closest<HTMLElement>('[data-action]')?.dataset.action;
+  if (action === 'locate') locate(target.closest('button')!);
+  if (action === 'pick-city') {
+    setTab('settings');
+    $('loc-input').focus();
+  }
 });
+
+// ───────────────────────── tabs (phone layout) ─────────────────────────
+type Tab = 'radar' | 'list' | 'sky' | 'settings';
+function setTab(tab: Tab) {
+  document.body.dataset.tab = tab;
+  for (const v of document.querySelectorAll<HTMLElement>('[data-view]')) v.classList.toggle('active', v.dataset.view === tab);
+  for (const b of document.querySelectorAll<HTMLElement>('.tab')) {
+    if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  }
+  if (phone.matches) window.scrollTo({ top: 0 });
+}
+for (const b of document.querySelectorAll<HTMLElement>('.tab')) b.addEventListener('click', () => setTab(b.dataset.tab as Tab));
+
+// ───────────────────────── details sheet (phone layout) ─────────────────────────
+const sheet = $('sheet');
+$('sheet-close').addEventListener('click', () => select(null));
+$('sheet-grip').addEventListener('click', () => sheet.classList.toggle('expanded'));
+{
+  // swipe the sheet's top bar: up expands, down shrinks or closes
+  let startY: number | null = null;
+  const bar = sheet.querySelector<HTMLElement>('.sheet-bar')!;
+  bar.addEventListener('touchstart', (e) => (startY = e.touches[0].clientY), { passive: true });
+  bar.addEventListener('touchend', (e) => {
+    if (startY === null) return;
+    const dy = e.changedTouches[0].clientY - startY;
+    startY = null;
+    if (dy < -30) sheet.classList.add('expanded');
+    else if (dy > 30) {
+      if (sheet.classList.contains('expanded')) sheet.classList.remove('expanded');
+      else select(null);
+    }
+  });
+}
 
 $('groups').addEventListener('change', (e) => {
   const input = e.target as HTMLInputElement;
@@ -547,36 +606,95 @@ function setPlace(p: Place) {
   tick();
 }
 
-$('btn-geo').addEventListener('click', () => {
-  if (!navigator.geolocation) return alert('Geolocation is not available in this browser.');
-  $('btn-geo').textContent = 'Locating…';
+function locMsg(text: string, warn = false) {
+  const el = $('loc-msg');
+  el.textContent = text;
+  el.classList.toggle('warn', warn);
+}
+
+function locate(btn: HTMLElement) {
+  if (!navigator.geolocation) {
+    setTab('settings');
+    return locMsg('This browser cannot share its location. Type a city instead.', true);
+  }
+  const label = btn.textContent;
+  btn.textContent = 'Locating…';
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      $('btn-geo').textContent = 'Use my location';
+      btn.textContent = label;
       // ~100 m precision is plenty for the sky, and kinder to your privacy.
       const r = (x: number) => Math.round(x * 1000) / 1000;
       setPlace({ lat: r(pos.coords.latitude), lon: r(pos.coords.longitude), heightM: pos.coords.altitude ?? 0, label: 'My location' });
+      locMsg('Location set. It stays in this browser.');
     },
     (err) => {
-      $('btn-geo').textContent = 'Use my location';
-      alert(`Could not get your location: ${err.message}`);
+      btn.textContent = label;
+      setTab('settings');
+      locMsg(
+        err.code === err.PERMISSION_DENIED
+          ? 'Location permission was refused. Type a city instead, or allow location in your browser settings.'
+          : `Could not get your location (${err.message}). Type a city instead.`,
+        true,
+      );
     },
     { enableHighAccuracy: false, timeout: 15_000, maximumAge: 600_000 },
   );
-});
+}
+
+$('city-list').innerHTML = CITIES.map((c) => `<option value="${esc(cityLabel(c))}"></option>`).join('');
 
 $('loc-form').addEventListener('submit', (e) => {
   e.preventDefault();
-  const m = $<HTMLInputElement>('loc-input').value.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)\s*$/);
-  const lat = m ? Number(m[1]) : Number.NaN;
-  const lon = m ? Number(m[2]) : Number.NaN;
-  if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) return alert('Enter latitude, longitude, e.g. 40.71, -74.01');
-  setPlace({ lat, lon, heightM: 0, label: 'Custom' });
+  const input = $<HTMLInputElement>('loc-input');
+  const text = input.value;
+  const ll = parseLatLon(text);
+  const city = ll ? null : findCity(text);
+  if (ll) setPlace({ ...ll, heightM: 0, label: 'Custom' });
+  else if (city) setPlace({ lat: city.lat, lon: city.lon, heightM: 0, label: cityLabel(city) });
+  else return locMsg('Not found. Try a big city nearby, or type latitude, longitude (e.g. 40.71, -74.01).', true);
+  input.value = '';
+  input.blur();
+  locMsg('Location set. It stays in this browser.');
+  if (phone.matches) setTab('radar');
 });
+
+// ───────────────────────── keep the screen on ─────────────────────────
+type WakeLock = { release(): Promise<void> };
+const wakeApi = (navigator as Navigator & { wakeLock?: { request(type: 'screen'): Promise<WakeLock> } }).wakeLock;
+let keepAwake = store('keepAwake', false);
+let wakeLock: WakeLock | null = null;
+async function syncWakeLock() {
+  if (!wakeApi) return;
+  if (keepAwake && document.visibilityState === 'visible' && !wakeLock) {
+    try {
+      wakeLock = await wakeApi.request('screen');
+      // the browser drops the lock whenever the tab is hidden
+      (wakeLock as unknown as EventTarget).addEventListener?.('release', () => (wakeLock = null));
+    } catch {
+      wakeLock = null;
+    }
+  } else if (!keepAwake && wakeLock) {
+    await wakeLock.release().catch(() => undefined);
+    wakeLock = null;
+  }
+}
+if (wakeApi) {
+  $('wake-row').hidden = false;
+  $<HTMLInputElement>('keep-awake').checked = keepAwake;
+  $('keep-awake').addEventListener('change', (e) => {
+    keepAwake = (e.target as HTMLInputElement).checked;
+    save('keepAwake', keepAwake);
+    void syncWakeLock();
+  });
+  document.addEventListener('visibilitychange', () => void syncWakeLock());
+  void syncWakeLock();
+}
 
 function applyNight(on: boolean) {
   document.documentElement.dataset.night = on ? '1' : '';
   $('btn-night').setAttribute('aria-pressed', String(on));
+  $('btn-night').setAttribute('aria-label', on ? 'Night mode on' : 'Night mode off');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', on ? '#000000' : '#05080d');
   radar.refreshTheme();
 }
 let night = store('night', false);
@@ -588,6 +706,7 @@ $('btn-night').addEventListener('click', () => {
 });
 
 // ───────────────────────── start ─────────────────────────
+setTab('radar');
 renderPlace();
 renderGroups();
 renderDetails();
