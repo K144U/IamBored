@@ -129,7 +129,7 @@ The weak link is **the phone's compass**, not the data. Here is the error from e
 - [x] **v0.2:** Pass predictions and visibility (sunlit and dark sky) *(built early; Web Worker included)*
 - [ ] **v0.3:** Aircraft radar layer (and a Worker proxy if CORS requires it)
 - [x] **v0.4:** Planets, Moon and bright stars layer *(925 stars to mag 4.5 from the HYG database; red night mode)*
-- [ ] **v0.5:** "What's That?" point & identify (sensors, calibration, matcher)
+- [x] **v0.5:** "What's That?" point & identify (sensors, calibration, matcher) *(built; needs field testing on real phones)*
 - [ ] **v0.6:** Starlink train and flare hunter
 - [ ] **v0.7:** Sound mode (nearest aircraft plus audio classifier)
 - [ ] **v0.8:** PWA install and push alerts
@@ -150,15 +150,28 @@ Handy URL parameters:
 - `?t=2026-11-04T20:00:00Z` starts the clock at a given moment, e.g. to preview a pass
 
 On a phone it works like an app:
-- Bottom tabs: **Radar**, **Overhead** (badge = satellites visible right now), **Planets**, **Settings**
+- Bottom tabs: **Radar**, **Identify**, **Passes** (badge = passes in the next 3 h), **Up now** (badge = satellites visible right now), **Settings**
 - Tap anything on the radar or a list row: a details sheet slides up (swipe up for more, swipe down or ✕ to close)
 - First visit asks where you are: **Use my location** or **Pick a city** (offline list, or type `lat, lon`)
 - "Next visible ISS pass in 2 h 05 min" countdown, big thumb-sized buttons, landscape layout
 - **Add to Home Screen** for a full-screen icon; optional **Keep the screen on** while you wait for a pass
+- Pinch, drag or double-tap the radar to zoom (up to 6×; more star names appear as you zoom); a short buzz confirms a tap (Android)
 
+**Identify ("What's That?")**: point your phone at a light in the sky.
+- Uses the motion sensors and compass (iOS asks once), corrected for magnetic declination (WMM2025)
+- Top 3 guesses with confidence, from satellites you can see right now, the Moon, planets and stars to magnitude 3; "nothing obvious here" when nothing fits
+- **Calibrate** on the Moon, a planet or a bright star: the error circle shrinks from ±12° to ±3° (kept 12 h)
+- **Hold to track** while you follow a moving light: its speed and direction separate satellites from stars
+- Optional camera view underneath, constellation lines, dashed 10-second paths for satellites, and an arrow pointing to whatever you picked on the radar
+- No sensors (desktop, or permission refused)? Drag the sky to look around instead
+
+**Passes**: every visible pass of the space stations and the ~150 brightest satellites over the next 48 h, by day, with countdowns. Tap 📅 to add one to your calendar (with a 10-minute reminder), or add them all.
+
+Times are shown in the **local time of the place you picked** (cities carry their time zone; typed coordinates borrow the nearest city's).
 What it does today:
 - Live polar sky radar with a sweep, satellites colored by visibility, Sun, Moon and planets
 - Bright stars (mag ≤ 4.5) tinted by colour, fading in as the sky darkens; the brightest are named, tap any star for name, constellation and brightness (toggle: "Show bright stars")
+- Constellation stick figures once it's dark (toggle: "Constellation lines")
 - "Overhead now" list (tap a row or a dot to select), "only what I can see" filter
 - Selected satellite: position, altitude, speed, orbit-data age, dashed path for the next 10 min, **next passes for 48 h** with ★ visible passes
 - "Next visible ISS pass" banner
@@ -175,3 +188,5 @@ SkyWatch uses public broadcast and open data only. It tracks objects (satellites
 MIT, see [LICENSE](../../LICENSE).
 
 The star catalogue `public/data/stars.json` is derived from the [HYG database](https://github.com/astronexus/HYG-Database) and is licensed **CC BY-SA 4.0**. Rebuild it with `node scripts/build-stars.mjs`.
+
+The constellation figures `public/data/constellations.json` come from [d3-celestial](https://github.com/ofrohn/d3-celestial) (BSD-3-Clause, © Olaf Frohn; the licence text is inside the file). Rebuild with `node scripts/build-constellations.mjs`. Magnetic declination: [magvar](https://www.npmjs.com/package/magvar) (MIT, WMM2025).

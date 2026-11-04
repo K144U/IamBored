@@ -9,6 +9,14 @@ This is the **v0.1 sandbox**: everything runs in your browser and your runs neve
 2. Or export your own runs as **GPX** (Strava: activity → ⋯ → *Export GPX*) and drop them on the page.
 3. Add friends as hot-seat players, switch the active player, and drop their GPX files to battle on one device.
 
+## On a phone
+It works like an app below 900 px wide: a full-screen map with a bottom tab bar (**Map · Add run · Board · Runs · How to**).
+- The pink **＋** on the map opens the file picker straight away; the claim animates on the map as soon as the file is read
+- A chip at the top shows who you are uploading as, your area and your rank (tap it for the leaderboard)
+- First visit: a welcome card with **Add a run** and **Try the demo**
+- "Getting a GPX file on a phone" explains the export for Strava, Garmin and others
+- **Add to Home Screen** gives a full-screen icon
+
 ## Rules (as built)
 | Rule | Detail |
 |---|---|
@@ -34,4 +42,4 @@ npm test -w loopland # claim engine + GPX/TCX parser tests
 | `src/game/parse.ts` | GPX / TCX import |
 | `src/game/demo.ts` | Synthetic demo season |
 | `src/ui/map.ts` | Leaflet map, territory rendering, replay animation |
-| `src/main.ts` | Sidebar, uploads, players, run log |
+| `src/main.ts` | Sidebar, uploads, players, run log, phone tabs |

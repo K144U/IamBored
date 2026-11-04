@@ -2,36 +2,50 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Real-life Paper.io for runners: run a loop, the land inside is yours." />
     <meta name="theme-color" content="#ff2e88" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="LoopLand" />
     <title>LoopLand</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2 28 9v14l-12 7-12-7V9z' fill='%23ff2e88'/%3E%3Cpath d='M16 9 22 12.5v7L16 23l-6-3.5v-7z' fill='%23fff'/%3E%3C/svg%3E" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
   </head>
-  <body>
+  <body data-tab="map">
     <div class="app">
       <aside class="side">
-        <header class="brand">
+        <header class="brand view" data-view="help">
           <h1><span class="hex" aria-hidden="true">⬢</span> LoopLand <span class="ver">v0.1 sandbox</span></h1>
           <p class="tag">Run a loop. The land inside is yours.</p>
         </header>
 
-        <section class="card">
+        <section class="card view" data-view="add">
           <h2>Add runs</h2>
           <p class="as">Uploading as <span id="active-player" class="chip"></span> <small>(tap a player below to switch)</small></p>
           <label id="drop" class="drop">
-            <input id="file" type="file" accept=".gpx,.tcx,application/gpx+xml" multiple hidden />
-            <span class="drop-big">Drop GPX / TCX files</span>
-            <span class="drop-small">or tap to choose · Strava: activity ⋯ → Export GPX</span>
+            <input id="file" type="file" accept=".gpx,.tcx,application/gpx+xml,application/xml,text/xml" multiple hidden />
+            <span class="drop-big"><span class="desk-only">Drop GPX / TCX files</span><span class="phone-only">Choose GPX / TCX files</span></span>
+            <span class="drop-small"><span class="desk-only">or tap to choose · </span>Strava: activity ⋯ → Export GPX</span>
           </label>
           <div class="row">
             <button id="btn-demo" class="btn primary">▶ Load demo season</button>
             <button id="btn-reset" class="btn ghost">Reset</button>
           </div>
+          <details class="howto">
+            <summary>Getting a GPX file on a phone</summary>
+            <ul>
+              <li><b>Strava:</b> the app can't export. Open strava.com in your browser, switch to the desktop site, open the activity, then ⋯ → Export GPX.</li>
+              <li><b>Garmin Connect:</b> on connect.garmin.com open the activity, then ⚙ → Export to GPX.</li>
+              <li><b>Most other apps</b> (Komoot, Coros, Suunto, Runkeeper) have Share or Export → GPX. Save it to Files, then pick it here.</li>
+            </ul>
+          </details>
         </section>
 
-        <section class="card">
+        <section class="card view" data-view="board">
           <h2>Leaderboard</h2>
+          <p class="hint">Tap a player to upload runs as them (hot-seat, one phone).</p>
           <ol id="players" class="players"></ol>
           <form id="add-player" class="row">
             <input id="new-player" class="input" placeholder="Add a friend (hot-seat)" maxlength="24" aria-label="New player name" />
@@ -39,12 +53,12 @@
           </form>
         </section>
 
-        <section class="card">
+        <section class="card view" data-view="runs">
           <h2>Runs</h2>
           <ul id="log" class="log"></ul>
         </section>
 
-        <details class="card rules">
+        <details class="card rules view" data-view="help">
           <summary>How it works</summary>
           <ul>
             <li><b>Claim:</b> close a loop (or finish within 75 m of your start) and everything inside becomes yours.</li>
@@ -57,11 +71,21 @@
           <p class="privacy">🔒 Sandbox mode: your runs never leave this browser.</p>
         </details>
 
-        <footer class="foot">Part of <a href="../">IamBored</a> · map © OpenStreetMap, CARTO · hexes: H3</footer>
+        <footer class="foot view" data-view="help">Part of <a href="../">IamBored</a> · map © OpenStreetMap, CARTO · hexes: H3</footer>
       </aside>
 
       <main class="map-wrap">
         <div id="map" aria-label="Territory map"></div>
+        <button id="who" class="who phone-only" aria-label="Leaderboard"></button>
+        <label class="fab phone-only" for="file" aria-label="Add a run (GPX or TCX file)">＋</label>
+        <div id="welcome" class="welcome phone-only" hidden>
+          <h2><span class="hex">⬢</span> Run a loop. Own the land.</h2>
+          <p>Add a run from your watch or app as a GPX file. Close a loop and everything inside it becomes yours. Your runs stay on this phone.</p>
+          <div class="row">
+            <label class="btn primary" for="file">＋ Add a run</label>
+            <button class="btn" data-demo>Try the demo</button>
+          </div>
+        </div>
         <div class="legend">
           <span><i class="sw solid"></i>Owned</span>
           <span><i class="sw faded"></i>Fading</span>
@@ -70,6 +94,28 @@
       </main>
     </div>
     <div id="toasts" class="toasts" aria-live="polite"></div>
+    <nav class="tabs" aria-label="Sections">
+      <button class="tab" data-tab="map" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9z" /><path d="M12 9.5 15 11v3l-3 1.6L9 14v-3z" /></svg>
+        Map
+      </button>
+      <button class="tab" data-tab="add">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" /></svg>
+        Add run
+      </button>
+      <button class="tab" data-tab="board">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V12M10 20V6M16 20v-5M22 20H2" /></svg>
+        Board
+      </button>
+      <button class="tab" data-tab="runs">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12" /><circle cx="4" cy="6" r="1" /><circle cx="4" cy="12" r="1" /><circle cx="4" cy="18" r="1" /></svg>
+        Runs<span id="runs-badge" class="tab-badge" hidden></span>
+      </button>
+      <button class="tab" data-tab="help">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" /></svg>
+        How to
+      </button>
+    </nav>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

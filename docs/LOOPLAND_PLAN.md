@@ -284,6 +284,7 @@ Each milestone is shippable on its own.
 - [x] Stored in localStorage/IndexedDB
 - [x] Replay animation
 - [x] Demo season + hot-seat players (friends on one device) to test stealing
+- [x] Phone layout: full-screen map, bottom tabs, one-tap ＋ upload, welcome card, home-screen manifest
 - [ ] Playtest with your own last 10 runs
 
 **Done when:** your own last 10 runs produce a sensible territory map. This is where we find out if it's fun.

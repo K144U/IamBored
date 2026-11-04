@@ -21,6 +21,25 @@ let results: ClaimResult[] = [];
 let activePlayer = YOU.id;
 const map = new GameMap($('map'));
 
+// ───────────────────────── phone layout: tabs ─────────────────────────
+const phone = matchMedia('(max-width: 899px)');
+type Tab = 'map' | 'add' | 'board' | 'runs' | 'help';
+function setTab(tab: Tab) {
+  document.body.dataset.tab = tab;
+  for (const v of document.querySelectorAll<HTMLElement>('[data-view]')) v.classList.toggle('active', v.dataset.view === tab);
+  for (const b of document.querySelectorAll<HTMLElement>('.tab')) {
+    if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  }
+  if (tab === 'help' && phone.matches) document.querySelector<HTMLDetailsElement>('.rules')!.open = true;
+  document.querySelector('.side')?.scrollTo({ top: 0 });
+}
+for (const b of document.querySelectorAll<HTMLElement>('.tab')) b.addEventListener('click', () => setTab(b.dataset.tab as Tab));
+/** on a phone, animations happen on the map tab */
+const showMap = () => {
+  if (phone.matches) setTab('map');
+};
+
 function rebuild(exclude?: Set<string>) {
   const acts = exclude ? activities.filter((a) => !exclude.has(a.id)) : activities;
   const r = replay(acts, DEFAULT_RULES);
@@ -64,6 +83,14 @@ function renderPlayers() {
     .join('');
   const active = playerById(activePlayer)!;
   $('active-player').innerHTML = `<span class="swatch" style="background:${active.color}"></span> ${esc(active.name)}`;
+  // map chip on phones: who you are, how much you own, your rank
+  const rank = sorted.findIndex((p) => p.id === activePlayer) + 1;
+  const mine = stats.get(activePlayer);
+  $('who').innerHTML = `<span class="hex" style="color:${active.color}">⬢</span> ${esc(active.name)} <small>${(mine?.areaKm2 ?? 0).toFixed(2)} km² · #${rank} of ${players.length}</small>`;
+  const n = results.filter((r) => r.accepted).length;
+  $('runs-badge').hidden = n === 0;
+  $('runs-badge').textContent = String(n);
+  $('welcome').hidden = activities.length > 0;
 }
 
 function pace(kmh: number) {
@@ -139,12 +166,14 @@ async function addActivities(newActs: Activity[], animate = true, fitAll = false
     if (!r.accepted) toast(`<b>${esc(a.name)}</b>: ${esc(r.reason ?? 'rejected')}`, 'bad');
   }
   if (animate && res.accepted) {
+    showMap();
     map.renderTerritory(before.game, players, Date.now());
     map.fitTo([res]);
     const color = playerById(res.playerId)?.color ?? '#333';
     await map.replay(res, color);
     toast(`<b>${esc(newest.name)}</b>: ${describe(res)}`);
   } else {
+    showMap();
     map.fitTo(after.results.filter((r) => r.accepted));
   }
   refresh();
@@ -225,6 +254,8 @@ $<HTMLInputElement>('file').addEventListener('change', (e) => {
 });
 
 $('btn-demo').addEventListener('click', () => void loadDemo());
+document.querySelector('[data-demo]')?.addEventListener('click', () => void loadDemo());
+$('who').addEventListener('click', () => setTab('board'));
 $('btn-reset').addEventListener('click', async () => {
   if (!confirm('Delete all runs and players from this browser?')) return;
   map.stopAnimation();
@@ -242,6 +273,7 @@ $('players').addEventListener('click', (e) => {
   if (!li) return;
   activePlayer = li.dataset.player!;
   renderPlayers();
+  if (phone.matches) toast(`New runs will be added as <b>${esc(playerById(activePlayer)!.name)}</b>.`);
 });
 
 $('add-player').addEventListener('submit', async (e) => {
@@ -264,6 +296,7 @@ $('log').addEventListener('click', async (e) => {
   if (rid) {
     const r = results.find((x) => x.activityId === rid);
     if (!r) return;
+    showMap();
     map.fitTo([r]);
     const color = playerById(r.playerId)?.color ?? '#333';
     await map.replay(r, color);
@@ -290,6 +323,7 @@ map.onCellClick(DEFAULT_RULES.res, (h3, latlng) => {
 });
 
 // ───────────────────────── start ─────────────────────────
+setTab('map');
 (async () => {
   const saved = await store.load();
   if (saved.players.length) players = saved.players.some((p) => p.id === YOU.id) ? saved.players : [YOU, ...saved.players];

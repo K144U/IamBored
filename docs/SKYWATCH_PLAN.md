@@ -377,9 +377,9 @@ Each milestone is shippable on its own.
 **Done when:** the ISS position matches Heavens-Above within 0.5° on the live site.
 
 ### v0.2: Passes & visibility
-- [ ] Shadow + twilight + magnitude model
-- [ ] Pass prediction (48 h) + passes screen + .ics export
-- [ ] Web Worker propagation, Starlink group
+- [x] Shadow + twilight model *(magnitude model not done: CelesTrak's OMM has no standard magnitude)*
+- [x] Pass prediction (48 h) + passes screen + .ics export
+- [x] Web Worker propagation, Starlink group
 
 **Done when:** predicted visible ISS passes match Heavens-Above times within ±10 s.
 
@@ -397,11 +397,12 @@ Each milestone is shippable on its own.
 **Done when:** planet positions are within 1′ of the reference.
 
 ### v0.5: What's That?
-- [ ] Sensor fusion → pointing vector (Android + iOS paths), declination
-- [ ] Calibration flow
-- [ ] Matcher (spatial + prior), top-3 card
-- [ ] AR camera overlay
-- [ ] Motion matching ("Track")
+- [x] Sensor fusion → pointing vector (Android + iOS paths), declination *(`deviceorientationabsolute` / `webkitCompassHeading`; `AbsoluteOrientationSensor` not used yet)*
+- [x] Calibration flow *(one-point; multi-point fit and FOV calibration not yet)*
+- [x] Matcher (spatial + prior), top-3 card
+- [x] AR camera overlay *(fixed 64° long-side FOV)*
+- [x] Motion matching ("Track") *(first/last-quarter average over the hold)*
+- [ ] Field test on real Android and iOS phones (the "done when" below)
 
 **Done when:** ≥ 90 % top-1 accuracy for Moon/planets and ≥ 70 % top-3 for satellites and planes in field tests after calibration.
 
@@ -420,6 +421,7 @@ Each milestone is shippable on its own.
 - [ ] ntfy alerts via Worker cron (opt-in)
 
 ### Later
+- [x] Constellation lines, radar zoom, observer time zones *(session 2)*
 - [ ] 3D globe view (globe.gl / CesiumJS)
 - [ ] Extra layers: earthquakes (USGS), ships (AIS), weather/cloud cover ("will clouds block this pass?")
 - [ ] Rocket launch countdowns (Launch Library 2)
