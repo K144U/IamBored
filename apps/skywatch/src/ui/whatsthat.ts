@@ -83,6 +83,8 @@ export class WhatsThat {
   private listAt = 0;
   private message = '';
   private messageUntil = 0;
+  /** the other guesses below the best one are folded away until asked for */
+  private showMore = false;
 
   private root = $('wt');
   private canvas = $<HTMLCanvasElement>('wt-canvas');
@@ -91,12 +93,17 @@ export class WhatsThat {
 
   constructor(private deps: WhatsThatDeps) {
     this.cal = deps.load<Calibration | null>('calibration', null);
-    $('wt-go').addEventListener('click', () => void this.start());
-    $('wt-camera').addEventListener('click', () => void this.toggleCamera());
+    $('wt-go').addEventListener('click', () => void this.begin(true));
+    $('wt-camera').addEventListener('click', () => void (this.stream ? this.stopCamera() : this.startCamera()));
     $('wt-cal').addEventListener('click', () => this.calibrate());
     $('wt-matches').addEventListener('click', (e) => {
-      const key = (e.target as HTMLElement).closest<HTMLElement>('[data-show]')?.dataset.show;
+      const t = e.target as HTMLElement;
+      const key = t.closest<HTMLElement>('[data-show]')?.dataset.show;
       if (key) deps.show(key);
+      if (t.closest('[data-more]')) {
+        this.showMore = !this.showMore;
+        this.listAt = 0; // redraw now
+      }
     });
     $('wt-hint').addEventListener('click', (e) => {
       if ((e.target as HTMLElement).closest('[data-reset-cal]')) {
@@ -168,6 +175,16 @@ export class WhatsThat {
       this.stopCamera();
       cancelAnimationFrame(this.raf);
     }
+  }
+
+  /**
+   * One tap does it all: motion sensors and (optionally) the camera. Both permission prompts are asked for
+   * straight away, while the tap still counts as a user gesture.
+   */
+  async begin(camera = true) {
+    const cam = camera && !this.stream ? this.startCamera() : Promise.resolve();
+    if (this.mode === 'idle') await this.start();
+    await cam;
   }
 
   private async start() {
@@ -256,17 +273,18 @@ export class WhatsThat {
     }
   };
 
-  private async toggleCamera() {
-    if (this.stream) return this.stopCamera();
+  private async startCamera() {
+    if (this.stream || !navigator.mediaDevices?.getUserMedia) return;
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
       this.video.srcObject = this.stream;
       this.video.hidden = false;
       await this.video.play().catch(() => undefined);
       $('wt-camera').setAttribute('aria-pressed', 'true');
+      $('wt-camera').textContent = '📷 Camera on';
       this.root.classList.add('cam');
     } catch {
-      this.note('Camera not available. The sky view works without it.');
+      this.note('No camera (or it was refused), so you get the drawn sky instead. That works just as well.');
     }
   }
 
@@ -276,6 +294,7 @@ export class WhatsThat {
     this.video.srcObject = null;
     this.video.hidden = true;
     $('wt-camera').setAttribute('aria-pressed', 'false');
+    $('wt-camera').textContent = '📷 Camera off';
     this.root.classList.remove('cam');
   }
 
@@ -311,12 +330,12 @@ export class WhatsThat {
     const known = this.cands.filter((c) => (c.kind === 'moon' || c.kind === 'planet' || (c.kind === 'star' && (c.mag ?? 9) < 1.6)) && c.el > 3);
     const pick = scoreCandidates(m, known, pointingSigma(false)).matches.find((x) => x.sep < 25);
     if (!pick) {
-      this.note('Point at the Moon, a bright planet or one of the brightest stars, then tap Calibrate.');
+      this.note('First point the circle at the Moon, a bright planet or one of the brightest stars, then tap Fix compass.');
       return;
     }
     this.cal = makeCalibration(m, pick.c.dir, pick.c.name, Date.now(), this.deps.observer());
     this.deps.save('calibration', this.cal);
-    this.note(`Calibrated on ${pick.c.name}: the compass was ${Math.abs(this.cal.dAz).toFixed(0)}° off.`);
+    this.note(`Compass fixed using ${pick.c.name} (it was ${Math.abs(this.cal.dAz).toFixed(0)}° off). Guesses are sharper now.`);
   }
 
   private focal() {
@@ -539,8 +558,8 @@ export class WhatsThat {
       return;
     }
     const { az, el } = azElFromEnu(fwd);
-    const accuracy = this.mode === 'drag' ? 'drag mode' : this.calibrated() ? `±3° · ${this.cal!.on}` : '±12° · compass';
-    pill.textContent = `${az.toFixed(0)}° ${compass(az)} · ${el.toFixed(0)}° up · ${accuracy}`;
+    const accuracy = this.mode === 'drag' ? 'drag to look' : this.calibrated() ? 'compass fixed' : 'rough compass';
+    pill.textContent = `${compass(az)} · ${el.toFixed(0)}° up · ${accuracy}`;
   }
 
   private renderList(fwd: Vec3) {
@@ -552,10 +571,16 @@ export class WhatsThat {
     }
     if (nothingObvious) {
       items.push(
-        `<li class="m none">Nothing obvious here.${matches.length ? ' Best guesses:' : ' It could be a plane, a faint satellite or a fainter star' + (this.calibrated() || this.mode === 'drag' ? '.' : ', or the compass is off: try Calibrate on the Moon or a bright planet.')}</li>`,
+        `<li class="m none">Nothing obvious here.${matches.length ? ' Best guesses:' : ' It could be a plane, a faint satellite or a fainter star' + (this.calibrated() || this.mode === 'drag' ? '.' : ', or the compass is off: aim at the Moon or a bright planet and tap Fix compass.')}</li>`,
       );
     }
     matches.forEach((m, i) => {
+      if (i === 1) {
+        items.push(
+          `<li class="m-more"><button class="link" data-more>${this.showMore ? 'Hide other guesses' : `Other guesses (${matches.length - 1})`}</button></li>`,
+        );
+      }
+      if (i > 0 && !this.showMore) return;
       const c = m.c;
       const type = { sat: 'Satellite', moon: 'Moon', planet: 'Planet', star: 'Star', sun: 'Sun' }[c.kind];
       let look = '';
@@ -564,7 +589,7 @@ export class WhatsThat {
         look = `Steady light moving ~${mv.rate.toFixed(1)}°/s towards the ${compass(mv.towardsAz)}.${c.important ? ' Very bright.' : ''}`;
       } else if (c.kind === 'planet') look = 'Bright and steady; planets barely twinkle.';
       else if (c.kind === 'star') look = 'Twinkles, and keeps its place among the other stars.';
-      items.push(`<li class="m">
+      items.push(`<li class="m${i === 0 && !nothingObvious ? ' best' : ''}">
         <span class="m-rank">${i + 1}</span>
         <div class="m-main"><b>${esc(c.name)}</b>
           <small>${type}${c.mag !== undefined ? ` · mag ${c.mag.toFixed(1)}` : ''} · ${m.sep.toFixed(1)}° off</small>
@@ -579,8 +604,8 @@ export class WhatsThat {
       if (this.mode === 'drag') hint = 'Drag the sky to look around.';
       else if (this.compassAccuracy !== null && this.compassAccuracy > 25)
         hint = 'The compass is unsure: wave the phone in a figure-8, away from metal.';
-      else if (this.calibrated()) hint = `Calibrated on ${esc(this.cal!.on)}. <button class="link" data-reset-cal>Reset</button>`;
-      else hint = 'Compass only (±12°). For ±3°, aim at the Moon, a planet or a bright star and tap Calibrate.';
+      else if (this.calibrated()) hint = `Compass fixed using ${esc(this.cal!.on)}. <button class="link" data-reset-cal>Undo</button>`;
+      else hint = 'Put the circle on a light. Guesses look off? Aim at the Moon, a planet or a bright star and tap 🧭 Fix compass.';
     } else hint = esc(hint);
     $('wt-hint').innerHTML = hint;
   }

@@ -23,7 +23,21 @@
 
         <section class="card view" data-view="add">
           <h2>Add runs</h2>
-          <p class="as">Uploading as <span id="active-player" class="chip"></span> <small>(tap a player below to switch)</small></p>
+          <p class="as">Adding runs as <span id="active-player" class="chip"></span> <small>(switch on the Board tab)</small></p>
+          <div id="strava" class="strava" hidden>
+            <div id="strava-off">
+              <a class="btn strava-btn" data-strava-connect href="#">Connect with Strava</a>
+              <p class="hint">Pick runs straight from your Strava account. You'll sign in on Strava; LoopLand only reads your activities, and they stay on this device.</p>
+            </div>
+            <div id="strava-on" hidden>
+              <p class="strava-who">Connected to Strava as <b id="strava-name"></b></p>
+              <div class="row">
+                <button id="strava-import" class="btn strava-btn">Import runs from Strava</button>
+                <button id="strava-disconnect" class="btn ghost">Disconnect</button>
+              </div>
+            </div>
+            <p class="or"><span>or add a file</span></p>
+          </div>
           <label id="drop" class="drop">
             <input id="file" type="file" accept=".gpx,.tcx,application/gpx+xml,application/xml,text/xml" multiple hidden />
             <span class="drop-big"><span class="desk-only">Drop GPX / TCX files</span><span class="phone-only">Choose GPX / TCX files</span></span>
@@ -81,11 +95,17 @@
         <label class="fab phone-only" for="file" aria-label="Add a run (GPX or TCX file)">＋</label>
         <div id="welcome" class="welcome phone-only" hidden>
           <h2><span class="hex">⬢</span> Run a loop. Own the land.</h2>
-          <p>Add a run from your watch or app as a GPX file. Close a loop and everything inside it becomes yours. Your runs stay on this phone.</p>
-          <div class="row">
-            <label class="btn primary" for="file">＋ Add a run</label>
-            <button class="btn" data-demo>Try the demo</button>
+          <ol class="steps">
+            <li><b>Go for a run</b> that comes back to where it started: round a block, a park, a lake.</li>
+            <li><b>Add the run here</b>, from Strava or as a GPX file.</li>
+            <li><b>The land inside your loop is yours.</b> Run round someone else's to steal it.</li>
+          </ol>
+          <div class="welcome-actions">
+            <a class="btn strava-btn" data-strava-connect hidden href="#">Connect with Strava</a>
+            <label class="btn primary" for="file">＋ Add a GPX file</label>
+            <button class="btn" data-demo>Just show me (demo)</button>
           </div>
+          <p class="welcome-note">Your runs stay on this phone.</p>
         </div>
         <div class="legend">
           <span><i class="sw solid"></i>Owned</span>
@@ -95,6 +115,20 @@
       </main>
     </div>
     <div id="toasts" class="toasts" aria-live="polite"></div>
+    <div id="strava-sheet" class="modal" role="dialog" aria-modal="true" aria-labelledby="strava-title" hidden>
+      <div class="modal-card">
+        <div class="modal-head">
+          <h2 id="strava-title">Your runs on Strava</h2>
+          <button id="strava-close" class="icon-x" aria-label="Close">✕</button>
+        </div>
+        <p id="strava-msg" class="hint">Loading your activities…</p>
+        <ul id="strava-list" class="strava-list"></ul>
+        <button id="strava-more" class="btn ghost" hidden>Show older runs</button>
+        <div class="modal-foot">
+          <button id="strava-go" class="btn primary" disabled>Import</button>
+        </div>
+      </div>
+    </div>
     <nav class="tabs" aria-label="Sections">
       <button class="tab" data-tab="map" aria-current="page">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9z" /><path d="M12 9.5 15 11v3l-3 1.6L9 14v-3z" /></svg>

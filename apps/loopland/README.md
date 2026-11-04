@@ -17,6 +17,9 @@ It works like an app below 900 px wide: a full-screen map with a bottom tab bar 
 - "Getting a GPX file on a phone" explains the export for Strava, Garmin and others
 - **Add to Home Screen** gives a full-screen icon
 
+## Strava import (on kittu.pro)
+Where a server offers it (the kittu.pro build sets `VITE_STRAVA_API=/api/strava`), the Add tab and the welcome card show **Connect with Strava**. You sign in on Strava (the app opens on phones), come back, tick runs (the 10 newest new ones are ticked; treadmill and manual entries can't be picked; rides are left out) and they're imported as the active player. Imports have ids `strava-<id>`, so importing again skips them, and a GPX of the same run becomes a version of it. The sign-in lives in an encrypted httpOnly cookie on the server's domain; runs are stored in this browser only. The server side (OAuth, token refresh, activity list, GPS streams) is in the kittu.pro repo, `app/api/strava/[action]/route.ts` + `lib/server/strava.ts`. Pure conversion: `src/game/strava.ts` (tested).
+
 ## Rules (as built)
 | Rule | Detail |
 |---|---|

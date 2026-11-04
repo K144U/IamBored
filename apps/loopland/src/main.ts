@@ -4,6 +4,7 @@ import { DEMO_ORIGIN, DEMO_PLAYERS, demoActivities } from './game/demo';
 import { parseActivityFile } from './game/parse';
 import { store } from './game/store';
 import { DEFAULT_RULES, type Activity, type Player } from './game/types';
+import { stravaActivityId, stravaToActivity, type StravaRun, type StravaStreams } from './game/strava';
 import { earlierVersions, resolveVersions } from './game/versions';
 import { GameMap } from './ui/map';
 
@@ -387,6 +388,164 @@ map.onCellClick(DEFAULT_RULES.res, (h3, latlng) => {
   );
 });
 
+// ───────────────────────── Strava import ─────────────────────────
+// Only where a server offers it (kittu.pro builds set VITE_STRAVA_API=/api/strava; see the kittu.pro repo's
+// app/api/strava). Sign-in happens on Strava; the server keeps the token in an httpOnly cookie, and runs come
+// back to this page and are stored in this browser like any GPX file.
+const STRAVA_API = (import.meta.env.VITE_STRAVA_API as string | undefined)?.replace(/\/$/, '') ?? '';
+let stravaOn = false;
+let stravaRuns: StravaRun[] = [];
+let stravaPage = 0;
+const stravaPick = new Set<number>();
+
+async function stravaFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${STRAVA_API}/${path}`, { credentials: 'same-origin', ...init });
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+  if (!res.ok) {
+    if (res.status === 401) void stravaStatus();
+    throw new Error(data.error ?? `HTTP ${res.status}`);
+  }
+  return data;
+}
+
+async function stravaStatus() {
+  if (!STRAVA_API) return;
+  try {
+    const st = await stravaFetch<{ enabled: boolean; connected: boolean; name: string | null }>('status');
+    $('strava').hidden = !st.enabled;
+    stravaOn = st.enabled;
+    $('strava-off').hidden = st.connected;
+    $('strava-on').hidden = !st.connected;
+    $('strava-name').textContent = st.name || 'you';
+    const connect = `${STRAVA_API}/connect?return=${encodeURIComponent(location.pathname)}`;
+    for (const a of document.querySelectorAll<HTMLAnchorElement>('[data-strava-connect]')) {
+      a.href = connect;
+      a.hidden = !st.enabled || st.connected;
+    }
+    return st;
+  } catch {
+    $('strava').hidden = true;
+  }
+}
+
+function renderStravaList() {
+  const have = new Set(activities.map((a) => a.id));
+  $('strava-list').innerHTML = stravaRuns
+    .map((r) => {
+      const added = have.has(stravaActivityId(r.id));
+      const when = new Date(r.start).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+      const why = !r.gps ? 'no GPS (treadmill or typed in)' : added ? 'already on the map' : '';
+      return `<li class="${!r.gps || added ? 'off' : ''}">
+        <label>
+          <input type="checkbox" data-strava-id="${r.id}" ${stravaPick.has(r.id) ? 'checked' : ''} ${r.gps ? '' : 'disabled'} />
+          <span><b>${esc(r.name)}</b><small>${esc(when)} · ${r.km.toFixed(1)} km · ${r.minutes} min${r.type !== 'Run' ? ` · ${esc(r.type)}` : ''}${why ? ` · ${why}` : ''}</small></span>
+        </label>
+      </li>`;
+    })
+    .join('');
+  const n = stravaPick.size;
+  const go = $<HTMLButtonElement>('strava-go');
+  go.disabled = n === 0;
+  go.textContent = n ? `Import ${n} run${n > 1 ? 's' : ''} as ${playerById(activePlayer)?.name ?? 'you'}` : 'Pick some runs';
+}
+
+async function loadStravaPage() {
+  $('strava-msg').textContent = 'Loading your activities…';
+  try {
+    const r = await stravaFetch<{ runs: StravaRun[]; more: boolean }>(`activities?page=${++stravaPage}`);
+    const have = new Set(activities.map((a) => a.id));
+    // first time: the 10 newest runs that aren't here yet are ticked
+    for (const run of r.runs) if (run.gps && !have.has(stravaActivityId(run.id)) && stravaPick.size < 10 && stravaPage === 1) stravaPick.add(run.id);
+    stravaRuns.push(...r.runs);
+    $('strava-more').hidden = !r.more;
+    $('strava-msg').textContent = stravaRuns.length
+      ? 'Tick the runs to put on the map. Loops claim land; out-and-back runs just count their distance.'
+      : 'No runs, walks or hikes on your Strava yet.';
+    renderStravaList();
+  } catch (err) {
+    $('strava-msg').textContent = `Couldn't load your Strava activities: ${(err as Error).message}`;
+  }
+}
+
+function openStrava() {
+  stravaRuns = [];
+  stravaPage = 0;
+  stravaPick.clear();
+  $('strava-list').innerHTML = '';
+  $('strava-sheet').hidden = false;
+  void loadStravaPage();
+}
+
+async function importStrava() {
+  const picked = stravaRuns.filter((r) => stravaPick.has(r.id));
+  const go = $<HTMLButtonElement>('strava-go');
+  go.disabled = true;
+  const out: Activity[] = [];
+  const now = Date.now();
+  for (const [i, run] of picked.entries()) {
+    go.textContent = `Getting ${i + 1} of ${picked.length}…`;
+    try {
+      const streams = await stravaFetch<StravaStreams>(`streams?id=${run.id}`);
+      const a = stravaToActivity(run, streams, activePlayer, now + i);
+      if (a) out.push(a);
+      else toast(`<b>${esc(run.name)}</b> has no GPS track, so it was skipped.`, 'bad');
+    } catch (err) {
+      toast(`<b>${esc(run.name)}</b>: ${esc((err as Error).message)}`, 'bad');
+      break; // most likely the rate limit or an expired sign-in: stop asking
+    }
+  }
+  $('strava-sheet').hidden = true;
+  if (out.length) {
+    await addActivities(out, true, out.length > 1);
+    toast(`Imported ${out.length} run${out.length > 1 ? 's' : ''} from Strava.`);
+  }
+}
+
+$('strava-list').addEventListener('change', (e) => {
+  const box = e.target as HTMLInputElement;
+  const id = Number(box.dataset.stravaId);
+  if (box.checked) stravaPick.add(id);
+  else stravaPick.delete(id);
+  renderStravaList();
+});
+$('strava-import').addEventListener('click', openStrava);
+// with Strava available, the map's ＋ offers both ways in (the Add tab) instead of jumping to the file picker
+document.querySelector('.fab')?.addEventListener('click', (e) => {
+  if (!stravaOn) return;
+  e.preventDefault();
+  setTab('add');
+});
+$('strava-more').addEventListener('click', () => void loadStravaPage());
+$('strava-go').addEventListener('click', () => void importStrava());
+$('strava-close').addEventListener('click', () => ($('strava-sheet').hidden = true));
+$('strava-disconnect').addEventListener('click', async () => {
+  if (!confirm('Disconnect Strava? Runs you already imported stay on the map.')) return;
+  await stravaFetch('disconnect', { method: 'POST' }).catch(() => undefined);
+  await stravaStatus();
+  toast('Disconnected from Strava.');
+});
+
+/** Coming back from Strava's sign-in page: ?strava=connected (or why it didn't work). */
+async function stravaReturn() {
+  const params = new URLSearchParams(location.search);
+  const result = params.get('strava');
+  const st = await stravaStatus();
+  if (!result) return;
+  params.delete('strava');
+  history.replaceState(null, '', `${location.pathname}${params.toString() ? `?${params}` : ''}${location.hash}`);
+  const msg: Record<string, string> = {
+    denied: 'Strava connection cancelled.',
+    'no-activities': 'LoopLand needs permission to see your activities. Connect again and leave that box ticked.',
+    expired: 'That took a while, so the sign-in expired. Please connect again.',
+    failed: "Couldn't connect to Strava. Please try again.",
+  };
+  if (result === 'connected' && st?.connected) {
+    toast(`Connected to Strava${st.name ? ` as <b>${esc(st.name)}</b>` : ''}. Pick runs to import.`);
+    setTab('add');
+    openStrava();
+  } else toast(msg[result] ?? msg.failed, 'bad');
+}
+
 // ───────────────────────── start ─────────────────────────
 setTab('map');
 (async () => {
@@ -396,4 +555,6 @@ setTab('map');
   activities = saved.activities;
   refresh();
   if (results.some((r) => r.accepted)) map.fitTo(results.filter((r) => r.accepted));
+  // after the saved runs are in, so the import list knows what's already on the map
+  await stravaReturn();
 })();

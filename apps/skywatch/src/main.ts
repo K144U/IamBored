@@ -30,7 +30,7 @@ import {
   type StarCatalogFile,
   type StarPosition,
 } from './engine/stars';
-import { compass, esc, fmtAgo, fmtDay, fmtDuration, fmtIn, fmtTime, fmtUtc, setTimeZone, tzName } from './ui/format';
+import { compass, esc, fmtAgo, fmtDay, fmtDuration, fmtIn, fmtTime, fmtUtc, setTimeZone, tzName, whereToLook } from './ui/format';
 import { Radar, type RadarObject } from './ui/radar';
 import type { Candidate } from './engine/matcher';
 import { enuFromAzEl, type Vec3 } from './engine/pointing';
@@ -613,8 +613,8 @@ function renderDetails() {
     if (!b) return;
     box.innerHTML = `<h3>${b.symbol} ${b.name}</h3>
       <dl class="kv">
-        <dt>Direction</dt><dd>${b.az.toFixed(1)}° ${compass(b.az)}</dd>
-        <dt>Elevation</dt><dd>${b.el.toFixed(1)}°${b.el < 0 ? ' (below horizon)' : ''}</dd>
+        <dt>Where</dt><dd class="look">${whereToLook(b.az, b.el)}</dd>
+        <dt>Exactly</dt><dd>${b.az.toFixed(1)}° ${compass(b.az)}, ${b.el.toFixed(1)}° up</dd>
         <dt>Brightness</dt><dd>mag ${b.mag.toFixed(1)}</dd>
         ${b.phase !== undefined ? `<dt>Illuminated</dt><dd>${Math.round(b.phase * 100)} %</dd>` : ''}
       </dl>
@@ -630,8 +630,8 @@ function renderDetails() {
       <dl class="kv">
         ${s.name !== s.designation ? `<dt>Designation</dt><dd>${esc(s.designation)}</dd>` : ''}
         ${con ? `<dt>Constellation</dt><dd>${esc(con)}</dd>` : ''}
-        <dt>Direction</dt><dd>${p.az.toFixed(1)}° ${compass(p.az)}</dd>
-        <dt>Elevation</dt><dd>${p.el.toFixed(1)}°${p.el < 0 ? ' (below horizon)' : ''}</dd>
+        <dt>Where</dt><dd class="look">${whereToLook(p.az, p.el)}</dd>
+        <dt>Exactly</dt><dd>${p.az.toFixed(1)}° ${compass(p.az)}, ${p.el.toFixed(1)}° up</dd>
         <dt>Brightness</dt><dd>mag ${s.mag.toFixed(1)}</dd>
         ${s.bv !== null ? `<dt>Colour</dt><dd>${starColourName(s.bv)} (B−V ${s.bv.toFixed(2)})</dd>` : ''}
       </dl>
@@ -655,8 +655,8 @@ function renderDetails() {
   updateTrail();
   box.innerHTML = `<h3>${esc(omm.OBJECT_NAME)} ${badge(status)}</h3>
     <dl class="kv">
-      <dt>Direction</dt><dd>${s.az.toFixed(1)}° ${compass(s.az)}</dd>
-      <dt>Elevation</dt><dd>${s.el.toFixed(1)}°</dd>
+      <dt>Where</dt><dd class="look">${whereToLook(s.az, s.el)}</dd>
+      <dt>Exactly</dt><dd>${s.az.toFixed(1)}° ${compass(s.az)}, ${s.el.toFixed(1)}° up</dd>
       <dt>Distance</dt><dd>${Math.round(s.rangeKm).toLocaleString()} km</dd>
       <dt>Altitude</dt><dd>${Math.round(s.altKm).toLocaleString()} km</dd>
       <dt>Speed</dt><dd>${s.speedKms.toFixed(2)} km/s</dd>
@@ -972,8 +972,40 @@ $('btn-night').addEventListener('click', () => {
   applyNight(night);
 });
 
+// ───────────────────────── first-visit guide & the big "Point at the sky" button ─────────────────────────
+const guide = $('guide');
+const guideSteps = [...guide.querySelectorAll<HTMLElement>('.guide-step')];
+let guideAt = 0;
+function showGuideStep(i: number) {
+  guideAt = i;
+  guideSteps.forEach((el, k) => (el.hidden = k !== i));
+  guide.querySelectorAll('.guide-dots i').forEach((d, k) => d.classList.toggle('on', k === i));
+  $('guide-next').textContent = i === guideSteps.length - 1 ? "Let's go" : 'Next';
+  $('guide-skip').hidden = i === guideSteps.length - 1;
+}
+function openGuide() {
+  showGuideStep(0);
+  guide.hidden = false;
+  $('guide-next').focus();
+}
+function closeGuide() {
+  guide.hidden = true;
+  save('guided', true);
+}
+$('guide-next').addEventListener('click', () => (guideAt < guideSteps.length - 1 ? showGuideStep(guideAt + 1) : closeGuide()));
+$('guide-skip').addEventListener('click', closeGuide);
+guide.addEventListener('keydown', (e) => e.key === 'Escape' && closeGuide());
+$('btn-help').addEventListener('click', openGuide);
+
+// one tap: switch to the Point tab and turn on the motion sensors and the camera
+$('btn-point').addEventListener('click', () => {
+  setTab('identify');
+  void whatsThat.begin(true);
+});
+
 // ───────────────────────── start ─────────────────────────
 setTab('radar');
+if (!store('guided', false) && !Number.isFinite(simStart)) openGuide();
 renderPlace();
 renderPasses();
 renderGroups();
