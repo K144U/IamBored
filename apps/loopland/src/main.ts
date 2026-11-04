@@ -4,6 +4,7 @@ import { DEMO_ORIGIN, DEMO_PLAYERS, demoActivities } from './game/demo';
 import { parseActivityFile } from './game/parse';
 import { store } from './game/store';
 import { DEFAULT_RULES, type Activity, type Player } from './game/types';
+import { earlierVersions, resolveVersions } from './game/versions';
 import { GameMap } from './ui/map';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -40,11 +41,13 @@ const showMap = () => {
   if (phone.matches) setTab('map');
 };
 
-function rebuild(exclude?: Set<string>) {
-  const acts = exclude ? activities.filter((a) => !exclude.has(a.id)) : activities;
-  const r = replay(acts, DEFAULT_RULES);
-  return r;
+/** Replay the current version of every run (older uploads of the same run don't count). */
+function rebuild() {
+  return replay(resolveVersions(activities).current, DEFAULT_RULES);
 }
+
+const fmtWhen = (t: number) =>
+  new Date(t).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 function refresh() {
   const r = rebuild();
@@ -114,27 +117,55 @@ function describe(r: ClaimResult): string {
   return parts.join(' · ');
 }
 
+function versionsHtml(current: Activity, older: Activity[]) {
+  const km = (a: Activity) => {
+    let m = 0;
+    for (let i = 1; i < a.points.length; i++) {
+      const p = a.points[i - 1];
+      const q = a.points[i];
+      const dy = (q.lat - p.lat) * 111_320;
+      const dx = (q.lon - p.lon) * 111_320 * Math.cos((p.lat * Math.PI) / 180);
+      m += Math.hypot(dx, dy);
+    }
+    return (m / 1000).toFixed(2);
+  };
+  return `<details class="versions">
+    <summary>${older.length} older upload${older.length > 1 ? 's' : ''} of this run</summary>
+    <ul>${older
+      .map(
+        (o) => `<li><span>${esc(o.name)} · ${km(o)} km · ${o.points.length} points${o.uploadedAt ? ` · uploaded ${esc(fmtWhen(o.uploadedAt))}` : ''}</span>
+        <span class="v-actions"><button class="link" data-use="${o.id}">Use this version</button><button class="link danger" data-delete-version="${o.id}">Delete</button></span></li>`,
+      )
+      .join('')}</ul>
+    <p class="v-note">Only the latest version (${km(current)} km) counts on the map.</p>
+  </details>`;
+}
+
 function renderLog() {
   const byId = new Map(activities.map((a) => [a.id, a]));
+  const { older } = resolveVersions(activities);
   const list = [...results].reverse();
   $('log').innerHTML = list.length
     ? list
         .map((r) => {
           const a = byId.get(r.activityId)!;
           const p = playerById(r.playerId);
-          const when = new Date(a.startedAt).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+          const when = fmtWhen(a.startedAt);
+          const prev = older.get(a.id) ?? [];
           return `<li class="entry ${r.accepted ? '' : 'rejected'}">
             <div class="entry-head">
               <span class="swatch" style="background:${p?.color ?? '#888'}"></span>
               <b>${esc(p?.name ?? '?')}</b> · ${esc(a.name)}
+              ${prev.length ? `<span class="latest" title="Uploaded ${a.uploadedAt ? esc(fmtWhen(a.uploadedAt)) : ''}">Latest of ${prev.length + 1} uploads</span>` : ''}
               <span class="when">${when}</span>
             </div>
             <div class="entry-body">${r.accepted ? `${(r.distanceM / 1000).toFixed(2)} km · ${pace(r.avgKmh)} · ` : ''}${describe(r)}</div>
             ${r.warnings.length ? `<div class="entry-warn">${r.warnings.map(esc).join(' ')}</div>` : ''}
             <div class="entry-actions">
               ${r.accepted ? `<button class="link" data-replay="${r.activityId}">▶ Replay</button>` : ''}
-              <button class="link danger" data-delete="${r.activityId}">Remove</button>
+              <button class="link danger" data-delete="${r.activityId}">Remove${prev.length ? ' all versions' : ''}</button>
             </div>
+            ${prev.length ? versionsHtml(a, prev) : ''}
           </li>`;
         })
         .join('')
@@ -151,13 +182,30 @@ function toast(html: string, kind: 'ok' | 'bad' = 'ok') {
 }
 
 // ───────────────────────── actions ─────────────────────────
-async function addActivities(newActs: Activity[], animate = true, fitAll = false) {
-  if (!newActs.length) return;
-  const ids = new Set(newActs.map((a) => a.id));
+async function addActivities(incoming: Activity[], animate = true, fitAll = false) {
+  if (!incoming.length) return;
+  const ids = new Set(incoming.map((a) => a.id));
   const before = rebuild();
-  activities = [...activities.filter((a) => !ids.has(a.id)), ...newActs];
-  await store.putActivities(newActs);
+  const previous = activities.filter((a) => !ids.has(a.id));
+  // a new export of a run that's already here (e.g. cropped on Strava) replaces it
+  for (const a of incoming) {
+    const older = earlierVersions(a, previous);
+    if (!older.length || !a.uploadedAt) continue;
+    const last = older.sort((x, y) => (y.uploadedAt ?? 0) - (x.uploadedAt ?? 0))[0];
+    toast(
+      `<b>${esc(a.name)}</b> is a newer version of a run you already added${last.uploadedAt ? ` (uploaded ${esc(fmtWhen(last.uploadedAt))})` : ''}. ` +
+        'The new one now counts; the old one is kept under Runs.',
+    );
+  }
+  activities = [...previous, ...incoming];
+  await store.putActivities(incoming);
   const after = rebuild();
+  // only uploads that ended up as a run's current version have results
+  const newActs = incoming.filter((a) => after.results.some((r) => r.activityId === a.id));
+  if (!newActs.length) {
+    refresh();
+    return;
+  }
   // The newest of the uploaded runs gets the animation.
   const newest = [...newActs].sort((a, b) => b.startedAt - a.startedAt)[0];
   const res = after.results.find((r) => r.activityId === newest.id)!;
@@ -199,6 +247,8 @@ async function handleFiles(files: FileList | File[]) {
         startedAt: parsed.points.find((p) => p.t !== undefined)?.t ?? Date.now(),
         source: parsed.format,
         points: parsed.points,
+        // + index keeps the order of a multi-file pick
+        uploadedAt: Date.now() + out.length,
       };
       if (known.has(fingerprint(a))) {
         toast(`<b>${esc(file.name)}</b> is already on the map.`, 'bad');
@@ -302,10 +352,25 @@ $('log').addEventListener('click', async (e) => {
     await map.replay(r, color);
     map.showTrail(r, color);
   } else if (did) {
-    activities = activities.filter((a) => a.id !== did);
-    await store.deleteActivity(did);
+    // removing a run removes all its uploaded versions
+    const gone = [did, ...(resolveVersions(activities).older.get(did) ?? []).map((a) => a.id)];
+    activities = activities.filter((a) => !gone.includes(a.id));
+    for (const id of gone) await store.deleteActivity(id);
     refresh();
     map.showTrail(null);
+  } else if (t.dataset.use) {
+    // make an older version current again by marking it as the latest upload
+    const a = activities.find((x) => x.id === t.dataset.use);
+    if (!a) return;
+    a.uploadedAt = Date.now();
+    await store.putActivities([a]);
+    refresh();
+    toast(`Now using the version of <b>${esc(a.name)}</b> with ${a.points.length} GPS points.`);
+  } else if (t.dataset.deleteVersion) {
+    const id = t.dataset.deleteVersion;
+    activities = activities.filter((a) => a.id !== id);
+    await store.deleteActivity(id);
+    refresh();
   }
 });
 

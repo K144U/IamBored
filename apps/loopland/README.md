@@ -25,6 +25,7 @@ It works like an app below 900 px wide: a full-screen map with a bottom tab bar 
 | Donut rule | A hole inside your land is only retaken if your run goes around it |
 | Fade | Not visited for 14 days → fading, and anyone can take it by running through. 30 days → neutral |
 | Fair play | Rejects runs > 22 km/h average, drops GPS teleports (> 30 km/h jumps), splits at GPS gaps > 200 m, rejects files without timestamps |
+| Re-uploads | Strava's GPX has no activity id, so a run is identified by **player + time**: a file whose time range overlaps ≥ 50 % of an existing run (of the shorter one) is a *newer version* of it. The latest upload counts and is marked "Latest of N uploads"; older versions stay under Runs ("Use this version" / "Delete"). Exactly the same file again is refused as a duplicate (`src/game/versions.ts`) |
 | Grid | [H3](https://h3geo.org/) resolution 11 hexagons (~25 m edge, ~2,150 m²) |
 
 ## Running it

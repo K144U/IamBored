@@ -134,6 +134,7 @@ docs/IDEAS.md             idea backlog
 - The sandbox replays all runs **sorted by `startedAt`**. The multiplayer plan says *upload order* plus a 48 h backdating limit. Change this when a server exists.
 - Parsing (`parse.ts`): GPX and TCX via `DOMParser`, matching on `localName` (namespace-agnostic). FIT is not supported (the user gets a message to export GPX).
 - Storage (`store.ts`): IndexedDB stores raw players and activities. The map is always rebuilt by replay, which is deterministic.
+- **Run versions** (`versions.ts`, owner asked "if people upload from Strava, how do we make sure the latest version is marked?"): Strava GPX has no activity id, so two uploads are the *same run* when they're the same player and their time ranges overlap by ≥ 50 % of the shorter one (min 1 min). `Activity.uploadedAt` is set on upload; `resolveVersions()` keeps the newest upload of each run as current (old data without `uploadedAt` loses to any timestamped upload), and only current versions are replayed. UI: a toast on re-upload, a "Latest of N uploads" badge, an "older uploads" list with **Use this version** (bumps its `uploadedAt`) and **Delete**; "Remove all versions" deletes the group. An identical file is still refused by the fingerprint check. With the Strava API later, key on the activity id instead (plan v0.3).
 - **Phone layout** (< 900 px, same pattern as SkyWatch): the map is fixed full-screen; `.side` becomes a full-screen page over it for every tab except Map. Tabs **Map · Add run · Board · Runs · How to** (`setTab` + `[data-view]`). A pink ＋ (`<label for="file">`) opens the file picker from the map; uploads, the demo and ▶ Replay switch to the Map tab before animating (`showMap()`). A `#who` chip shows the active player, area and rank (tap → Board). A `#welcome` card shows while there are no activities. Leaflet's zoom buttons are hidden on phones (pinch). Toasts sit at the top. "Getting a GPX file on a phone" explains Strava/Garmin exports. Manifest + icons in `public/`.
 - UI:
   - `src/ui/map.ts`: Leaflet canvas renderer, CARTO Voyager tiles, `cellsToMultiPolygon` per player, dashed style for fading land, replay animation
@@ -141,7 +142,7 @@ docs/IDEAS.md             idea backlog
 - Demo: `src/game/demo.ts`, a synthetic seeded season in Central Park with players Blaze and Nova. It shows a steal, a revenge excursion, a figure-8, an out-and-back that claims nothing, and fading land.
 
 **Verified:**
-- 23 tests:
+- 29 tests:
   - claim, out-and-back, open U, auto-close, figure-8, noise loops
   - jitter stability within ±15 %
   - steal, excursion, donut rule
@@ -151,6 +152,7 @@ docs/IDEAS.md             idea backlog
   - GPX/TCX parsing
 - Performance: a 3 km × 3 km loop (~4.3k cells) processes in ~140 ms.
 - Playwright desktop and mobile runs, persistence across reload, production sub-path build.
+- Run versions: 6 unit tests (crop = same run, back-to-back/other player/small overlap = different, newest wins, re-upload of the original wins, untimestamped data, lookup); Playwright: upload a loop, then an edited export → toast + one run "Latest of 2 uploads" + no double area; Use this version survives reload; Remove all versions empties the list.
 - Phone flows (iPhone 13): ＋ → file chooser → GPX loop claimed with the animation on the map; Add → demo → map; chip → Board; Runs → ▶ Replay → map; How to; desktop unchanged (no tabs/＋). No overflow, no console errors.
 
 **Not verified:**

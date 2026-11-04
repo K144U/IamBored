@@ -285,6 +285,7 @@ Each milestone is shippable on its own.
 - [x] Replay animation
 - [x] Demo season + hot-seat players (friends on one device) to test stealing
 - [x] Phone layout: full-screen map, bottom tabs, one-tap ＋ upload, welcome card, home-screen manifest
+- [x] Re-uploads of the same run (e.g. edited on Strava) become versions: the latest upload counts and is marked; older ones can be restored
 - [ ] Playtest with your own last 10 runs
 
 **Done when:** your own last 10 runs produce a sensible territory map. This is where we find out if it's fun.
@@ -297,6 +298,7 @@ Each milestone is shippable on its own.
 
 ### v0.3: Auto-import
 - [ ] Verify the Strava API terms, then add the Strava webhook import (or Garmin, or both)
+- [ ] Versions with the API: key runs on the Strava **activity id**; on an `update` webhook event re-fetch the activity and replace the stored version. Keep the sandbox's time-overlap rule (`versions.ts`) for file uploads and as a fallback, so a GPX of the same run can't claim twice
 - [ ] Anti-cheat validation + trust levels + rollback tool
 
 ### v0.4: Crews & seasons
