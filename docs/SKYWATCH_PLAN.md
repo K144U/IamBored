@@ -1,6 +1,6 @@
 # SkyWatch: Detailed Project Plan
 
-> Status: **v0.1 built** (plus pass predictions from v0.2 and Sun/Moon/planets from v0.4). Code: [`apps/skywatch/`](../apps/skywatch/).
+> Status: **v0.1 built**, plus pass predictions (v0.2), Sun/Moon/planets (v0.4) and the **AR spotting view** (most of v0.5). Code: [`apps/skywatch/`](../apps/skywatch/).
 > Overview and accuracy summary: see [README](../README.md).
 
 ---
@@ -395,11 +395,13 @@ Each milestone is shippable on its own.
 **Done when:** planet positions are within 1′ of the reference.
 
 ### v0.5: What's That?
-- [ ] Sensor fusion → pointing vector (Android + iOS paths), declination
-- [ ] Calibration flow
-- [ ] Matcher (spatial + prior), top-3 card
-- [ ] AR camera overlay
+- [x] Sensor fusion → pointing vector (Android + iOS paths), declination (WMM2025)
+- [x] Calibration flow (one-point yaw on the Moon / a bright planet)
+- [x] Matcher (spatial + prior), top-3 card
+- [x] AR camera overlay (+ future path with minute ticks, off-screen guide arrow, drag-to-look fallback)
 - [ ] Motion matching ("Track")
+- [ ] Multi-point calibration (yaw + tilt) and camera-FOV calibration on a known object
+- [ ] Field test on real Android + iPhone hardware
 
 **Done when:** ≥ 90 % top-1 accuracy for Moon/planets and ≥ 70 % top-3 for satellites and planes in field tests after calibration.
 

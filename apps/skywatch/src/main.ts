@@ -16,6 +16,9 @@ import {
 } from './engine/satellites';
 import { skyBodies, skyState, sunAltitude, type BodyPosition } from './engine/sky';
 import { compass, esc, fmtAgo, fmtDay, fmtDuration, fmtTime, fmtUtc } from './ui/format';
+import { declination } from './engine/declination';
+import type { Candidate } from './engine/identify';
+import { ArView, type ArScene } from './ui/ar';
 import { Radar, type RadarObject } from './ui/radar';
 import type { SatSample, WorkerRequest, WorkerResponse } from './workers/propagate.worker';
 
@@ -96,6 +99,7 @@ const enabled = new Set<string>(store<string[]>('groups', ['stations', 'visual']
 let rows: SatRow[] = [];
 let bodies: BodyPosition[] = [];
 let sunAlt = 0;
+let lastSampleTime = 0;
 let totalTracked = 0;
 let calcMs = 0;
 let selected: string | null = null;
@@ -130,6 +134,7 @@ worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
 };
 
 function onSamples(samples: SatSample[], at: Date) {
+  lastSampleTime = at.getTime();
   sunAlt = sunAltitude(at, place);
   const seen = new Set<number>();
   const out: SatRow[] = [];
@@ -304,6 +309,7 @@ function renderDetails() {
     const b = bodies.find((x) => `body:${x.id}` === selected);
     if (!b) return;
     box.innerHTML = `<h3>${b.symbol} ${b.name}</h3>
+      ${b.id !== 'sun' ? '<button class="btn primary ar-find" data-ar>📷 Find it in AR</button>' : ''}
       <dl class="kv">
         <dt>Direction</dt><dd>${b.az.toFixed(1)}° ${compass(b.az)}</dd>
         <dt>Elevation</dt><dd>${b.el.toFixed(1)}°${b.el < 0 ? ' (below horizon)' : ''}</dd>
@@ -329,6 +335,7 @@ function renderDetails() {
   const passes = passesFor(omm);
   updateTrail();
   box.innerHTML = `<h3>${esc(omm.OBJECT_NAME)} ${badge(status)}</h3>
+    <button class="btn primary ar-find" data-ar>📷 Find it in AR</button>
     <dl class="kv">
       <dt>Direction</dt><dd>${s.az.toFixed(1)}° ${compass(s.az)}</dd>
       <dt>Elevation</dt><dd>${s.el.toFixed(1)}°</dd>
@@ -426,6 +433,11 @@ function refreshHighlight(force = false) {
 // ───────────────────────── events ─────────────────────────
 document.addEventListener('click', (e) => {
   const target = e.target as HTMLElement;
+  if (target.closest('#ar')) return; // the AR view handles its own clicks
+  if (target.closest('[data-ar]')) {
+    void ar.open();
+    return;
+  }
   const row = target.closest<HTMLElement>('[data-key]');
   if (row && !target.closest('canvas')) select(row.dataset.key === selected && row.tagName === 'TR' ? null : row.dataset.key!);
 });
@@ -500,6 +512,91 @@ $('btn-night').addEventListener('click', () => {
   save('night', night);
   applyNight(night);
 });
+
+// ───────────────────────── AR view ─────────────────────────
+let arPathCache: { key: string | null; at: number; path: ArScene['path']; note?: string } = { key: null, at: 0, path: [] };
+
+/** Where the selected satellite will be: the rest of this pass, or its next pass if it's below the horizon. */
+function arPath(): { path: ArScene['path']; note?: string } {
+  const t = now().getTime();
+  if (arPathCache.key === selected && t - arPathCache.at < 10_000) return arPathCache;
+  let path: ArScene['path'] = [];
+  let note: string | undefined;
+  const omm = selectedOmm();
+  const rec = omm ? satrecFor(omm) : null;
+  if (omm && rec) {
+    const d = new Date(t);
+    const s = satState(rec, d, toGeodetic(place), sunEci(d));
+    if (s && s.el > 0) {
+      const pts = trackAzEl(rec, place, new Date(t - 20_000), new Date(t + 12 * 60_000), 10);
+      const end = pts.findIndex((p) => p.t > t && p.el < 0);
+      path = end > 0 ? pts.slice(0, end + 1) : pts;
+      const st = classify(s, sunAlt);
+      note =
+        st === 'visible'
+          ? 'up now and sunlit: look for a steady, moving light'
+          : st === 'eclipsed'
+            ? "up now but in Earth's shadow (invisible)"
+            : 'up now, but the sky is too bright to see it';
+    } else {
+      const next = passesFor(omm).find((p) => p.rise.getTime() > t && p.rise.getTime() - t < 3 * 3600_000);
+      if (next) {
+        path = trackAzEl(rec, place, next.rise, next.set, 10);
+        const mins = Math.max(0, Math.round((next.rise.getTime() - t) / 60_000));
+        const when = mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)} h ${mins % 60} min`;
+        note = `rises in ${when} in the ${compass(next.riseAz)}${
+          next.visibleFrom ? `, visible from ${fmtTime(next.visibleFrom, false)}` : ' (this pass is not visible)'
+        }`;
+      } else {
+        note = 'below the horizon, no pass in the next 3 h';
+      }
+    }
+  }
+  arPathCache = { key: selected, at: t, path, note };
+  return arPathCache;
+}
+
+function arScene(): ArScene {
+  const objects: Candidate[] = rows.map((r) => ({
+    key: r.key,
+    kind: 'sat',
+    label: r.name,
+    az: r.az,
+    el: r.el,
+    status: r.status,
+    important: r.important,
+  }));
+  for (const b of bodies) objects.push({ key: `body:${b.id}`, kind: 'body', label: b.name, az: b.az, el: b.el, mag: b.mag });
+  const { path, note } = arPath();
+  // selected satellite below the horizon: point people to where it will rise
+  if (selected?.startsWith('sat:') && !rows.some((r) => r.key === selected) && path.length) {
+    const omm = selectedOmm();
+    objects.push({
+      key: selected,
+      kind: 'sat',
+      label: `${omm?.OBJECT_NAME ?? 'Satellite'} rises here`,
+      az: path[0].az,
+      el: Math.max(0.5, path[0].el),
+      status: 'below',
+    });
+  }
+  const t = now();
+  return {
+    time: t.getTime(),
+    sampleTime: lastSampleTime,
+    objects,
+    path,
+    pathNote: note,
+    selected,
+    declination: declination(place.lat, place.lon, t),
+  };
+}
+
+const ar = new ArView({
+  getScene: arScene,
+  onSelect: (key) => select(key === selected ? null : key),
+});
+$('btn-ar').addEventListener('click', () => void ar.open());
 
 // ───────────────────────── start ─────────────────────────
 renderPlace();

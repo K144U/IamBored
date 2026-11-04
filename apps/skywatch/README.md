@@ -129,7 +129,7 @@ The weak link is **the phone's compass**, not the data. Here is the error from e
 - [x] **v0.2:** Pass predictions and visibility (sunlit and dark sky) *(built early; Web Worker included)*
 - [ ] **v0.3:** Aircraft radar layer (and a Worker proxy if CORS requires it)
 - [ ] **v0.4:** Planets, Moon and bright stars layer *(Sun, Moon and planets done; bright stars to do)*
-- [ ] **v0.5:** "What's That?" point & identify (sensors, calibration, matcher)
+- [ ] **v0.5:** "What's That?" point & identify (sensors, calibration, matcher) *(AR view, calibration and matcher built; motion matching to do)*
 - [ ] **v0.6:** Starlink train and flare hunter
 - [ ] **v0.7:** Sound mode (nearest aircraft plus audio classifier)
 - [ ] **v0.8:** PWA install and push alerts
@@ -148,6 +148,18 @@ npm test -w skywatch
 Handy URL parameters:
 - `?lat=40.71&lon=-74.01` sets the location (not saved, nothing is written to the URL by the app)
 - `?t=2026-11-04T20:00:00Z` starts the clock at a given moment, e.g. to preview a pass
+
+### 📷 AR view (spotting mode)
+Tap **📷 AR view** (or **Find it in AR** on a selected object) and hold your phone up to the sky:
+- Live camera with labels for the ISS, visible satellites, the Moon and planets, plus the horizon and compass points
+- The selected satellite's **path for the next minutes with clock-time ticks**. If it's below the horizon, you see where its next pass will rise and when.
+- **Guide arrow** plus "turn right 40° and up 15°" when the target is off screen
+- **What's that?** card: the top 3 objects near the crosshair, with confidence
+- **Calibrate** on the Moon or a bright planet to fix compass error (±12° → ±3°). It's saved for 6 h.
+- Magnetic → true north correction (NOAA World Magnetic Model 2025)
+- No sensors (desktop) or permission denied: **drag to look around**, scroll to zoom
+- **Zoom fit** slider: match the overlay to your camera's field of view
+- Needs HTTPS (GitHub Pages is fine). On iPhone, Safari asks for motion access when you open AR.
 
 What v0.1 does today:
 - Live polar sky radar with a sweep, satellites colored by visibility, Sun, Moon and planets

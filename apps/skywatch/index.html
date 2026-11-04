@@ -16,6 +16,7 @@
         <span id="clock-utc" class="dim">--:--:-- UTC</span>
       </div>
       <div id="sky-state" class="sky-state"></div>
+      <button id="btn-ar" class="btn primary" title="Point your phone at the sky">📷 AR view</button>
       <button id="btn-night" class="btn" aria-pressed="false" title="Red light keeps your eyes dark-adapted">Night mode</button>
     </header>
 
@@ -83,6 +84,24 @@
         </div>
       </section>
     </main>
+
+    <div id="ar" class="ar" hidden>
+      <video id="ar-video" playsinline muted autoplay></video>
+      <canvas id="ar-canvas" aria-label="Augmented reality sky view"></canvas>
+      <div class="ar-top">
+        <button id="ar-close" class="ar-btn" aria-label="Close AR view">✕</button>
+        <div id="ar-facing" class="ar-facing"></div>
+        <button id="ar-calib" class="ar-btn">Calibrate</button>
+      </div>
+      <div id="ar-hint" class="ar-hint" hidden></div>
+      <div class="ar-bottom">
+        <div id="ar-what" class="ar-what"></div>
+        <div class="ar-controls">
+          <label class="ar-zoom">Zoom fit <input id="ar-fov" type="range" min="25" max="110" step="1" aria-label="Camera field of view" /></label>
+          <label class="ar-toggle"><input type="checkbox" id="ar-all" /> All satellites</label>
+        </div>
+      </div>
+    </div>
 
     <footer class="foot">
       Orbits: <a href="https://celestrak.org/" target="_blank" rel="noopener">CelesTrak</a> ·

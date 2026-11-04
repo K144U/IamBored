@@ -1,6 +1,6 @@
 # Handover
 
-> Last updated: 2026-11-04, at the end of the first build session.
+> Last updated: 2026-11-04, after adding the SkyWatch AR view (second batch of work, same session).
 > Branch: `claude/peaceful-wright-2tlzr7` (all work is here; `main` has only the initial commit; no PR opened yet).
 
 ## 1. Context: the owner and how we got here
@@ -28,7 +28,25 @@ docs/IDEAS.md             idea backlog
 ```
 
 ## 3. SkyWatch: state
-**Built:** v0.1, plus parts of v0.2 and v0.4.
+**Built:** v0.1, plus parts of v0.2 and v0.4, plus the **AR spotting view** (most of v0.5).
+- **AR view:**
+  - `src/ui/ar.ts`: camera + canvas overlay, labels, future path with minute ticks, off-screen guide arrow, "What's that?" card, calibration, drag/zoom fallback, Wake Lock
+  - `src/ui/sensors.ts`:
+    - Android: `deviceorientationabsolute`
+    - iOS: relative `deviceorientation` + `webkitCompassHeading`, with a smoothed offset that is only updated when the camera is within 65° of the horizon
+    - always listens even if `requestPermission()` says "denied": headless Chromium does that, and some real browsers may too
+  - `src/engine/orientation.ts`: pure math, tested
+    - W3C Euler → device→ENU matrix `Rz(α)Rx(β)Ry(γ)`
+    - rear camera = device −Z
+    - screen-orientation handling
+    - pinhole projection
+    - `coverFocal` for `object-fit: cover` video
+  - `src/engine/declination.ts`: WMM2025 via the `geomagnetism` package; compasses are magnetic
+  - `src/engine/identify.ts`: Gaussian spatial score × brightness/visibility prior, with an "unknown" weight
+  - **Pointing error σ:** 12° uncalibrated, iOS `webkitCompassAccuracy` when reported, 3° after calibration, 2° in drag mode
+  - **Calibration:** one-point yaw only, saved in localStorage for 6 h. Tilt is trusted from the accelerometer.
+  - **Smoothing:** positions arrive at 1 Hz from the worker; AR extrapolates each object linearly between samples
+  - **Path:** `arPath()` in `main.ts` gives the rest of the current pass, or the next pass within 3 h (a "rises here" marker plus the path)
 - Polar radar canvas (`src/ui/radar.ts`): zenith in the center, N up, **E right** (map-style, not the "looking up" convention), rotating sweep, label collision avoidance, tap to select.
 - Data (`src/data/celestrak.ts`):
   - CelesTrak **OMM JSON** per group (`stations`, `visual`, `last-30-days`, `starlink`)
@@ -67,7 +85,7 @@ docs/IDEAS.md             idea backlog
 **Next (from `docs/SKYWATCH_PLAN.md`):**
 1. v0.3 aircraft layer: test CORS on adsb.lol / airplanes.live / OpenSky first.
 2. v0.4 bright stars (`public/data/stars.json`, mag ≤ 4.5).
-3. v0.5 "What's That?" (phone sensors, calibration, matcher). This is the headline feature.
+3. Finish v0.5: **field-test AR on a real Android phone and an iPhone** (iOS `webkitCompassHeading` semantics when the phone is held upright are assumed, not verified), then motion matching ("Track"), multi-point/tilt calibration, FOV calibration on a known object.
 4. v0.6 Starlink trains.
 5. v0.7 sound mode.
 6. v0.8 PWA and alerts.
@@ -134,6 +152,12 @@ docs/IDEAS.md             idea backlog
 - **Network:** `registry.npmjs.org` works. `celestrak.org`, `basemaps.cartocdn.com` and `tile.openstreetmap.org` are blocked.
 - **Playwright:** preinstalled. Run scripts with `NODE_PATH=$(npm root -g) node script.cjs`.
 - **CelesTrak in screenshots:** intercept it with `page.route('https://celestrak.org/**', …)` and fulfill with fixture OMM JSON. Abort tile requests.
+- **SkyWatch AR in headless Chromium:**
+  - launch with `--use-fake-ui-for-media-stream --use-fake-device-for-media-stream` for a fake camera (green test pattern)
+  - drive the sensors with `window.dispatchEvent(new DeviceOrientationEvent('deviceorientationabsolute', { alpha, beta, gamma, absolute: true }))` on a 16 ms interval
+  - to aim at true az A, el E with declination D (Beijing ≈ −7.5°): `alpha = 360 − (A − D)`, `beta = 90 + E`, `gamma = 0`
+  - with the visible-ISS scene below, `alpha 62.5, beta 127` centres the ISS
+  - stub `getUserMedia` to reject for the sky-only/drag-mode view
 - **SkyWatch fixture:** `apps/skywatch/src/test/fixtures.ts` holds `ISS_2019`, the satellite.js README TLE as OMM, with epoch 2019-06-05.
   - Visible-ISS scene: `?t=2019-06-05T12:43:30Z&lat=39.9&lon=116.4` (Beijing; the ISS is sunlit, the sky is in nautical twilight)
   - Daytime overhead pass from London: about 2019-06-05T17:14Z
