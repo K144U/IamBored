@@ -1,7 +1,7 @@
 # Handover
 
 > Last updated: 2026-11-04, at the end of the second build session (SkyWatch v0.4 stars, phone-first redesign, Passes, What's That? v0.5, smaller touches; LoopLand phone layout).
-> Branch: `claude/vigilant-noether-hxgibq` (continues the first session's `claude/peaceful-wright-2tlzr7`; `main` has only the initial commit; no PR opened yet).
+> Branch: `claude/vigilant-noether-hxgibq`, **merged into `main`** via [K144U/IamBored#1](https://github.com/K144U/IamBored/pull/1) at the owner's request. Start new work from `main`.
 
 ### Session log
 | # | Branch | What shipped |
@@ -178,7 +178,7 @@ docs/IDEAS.md             idea backlog
   2. set Settings → Pages → Source: GitHub Actions
   3. merge to `main`
 - The site will be at `https://k144u.github.io/IamBored/` (landing), with `/skywatch/` and `/loopland/` under it.
-- The owner hasn't asked for a PR yet. Ask before opening one.
+- Session 2's work is merged into `main` (PR #1). Merging alone doesn't deploy anything until the workflow above is added.
 
 ## 6. Testing in the cloud sandbox
 - **Network:** `registry.npmjs.org` and `raw.githubusercontent.com` work. `celestrak.org`, `basemaps.cartocdn.com`, `tile.openstreetmap.org`, `cdn.jsdelivr.net` and the flight APIs (`api.adsb.lol`, `api.airplanes.live`, `opensky-network.org`) are blocked.
@@ -220,4 +220,3 @@ docs/IDEAS.md             idea backlog
 1. SkyWatch radar orientation: keep E on the right (map-style), or switch to "looking up" (E on the left) as an option?
 2. LoopLand name: keep "LoopLand"? (Alternatives are in plan §15.)
 3. Should the sandbox get a JSON export/import so friends can share a map before a server exists?
-4. Open a PR to `main` now, or keep building on the branch?
