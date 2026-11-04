@@ -31,7 +31,14 @@ npm run build
 ```
 `npm run build` produces one static site in `dist/` (landing page + `skywatch/` + `loopland/`).
 
-## Deploy (GitHub Pages)
+## Live on kittu.pro
+Both apps are served by the owner's site (repo `K144U/Kittu.pro`, a Next.js app on Vercel):
+- **https://www.kittu.pro/skywatch** (short link `/sky`)
+- **https://www.kittu.pro/loopland** (short link `/run`)
+
+`npm run build:embed` builds them into `dist-embed/` with absolute bases (`/skywatch/`, `/loopland/`) and a "Part of kittu.pro" footer. In the kittu.pro repo, `node scripts/sync-labs.mjs /path/to/IamBored` runs that build and copies the result into its `public/`; commit and push kittu.pro's `master` to deploy. kittu.pro also serves SkyWatch's satellite backup at `/skywatch/data/tle/<group>.json` (a server route that caches CelesTrak for 2 h), which stands in for the daily snapshot below.
+
+## Deploy (GitHub Pages, optional)
 The deploy workflow is ready in [`deploy/pages.yml`](deploy/pages.yml). It type-checks, tests and builds on every push, **deploys from `main`**, and rebuilds daily to refresh SkyWatch's fallback satellite snapshot.
 
 One-time setup:
